@@ -3,12 +3,12 @@ import { lazy, Suspense } from "react";
 
 const App = lazy(() => import("../App"));
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/$")({
   ssr: false,
-  component: IndexRoute,
+  component: AppRoute,
 });
 
-function IndexRoute() {
+function AppRoute() {
   return (
     <Suspense fallback={null}>
       <App />
