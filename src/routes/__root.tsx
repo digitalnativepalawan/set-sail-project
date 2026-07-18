@@ -92,10 +92,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "A rooftop coworking space and boutique long-stay destination for digital nomads in San Vicente, Palawan.",
+          "A rooftop coworking space and boutique long-stay destination for digital nomads in San Vicente, Palawan. Starlink internet, guest kitchen, and long-stay suites.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Marina Terrace | Rooftop Coworking & Long Stays in Palawan" },
+      { name: "twitter:description", content: "A rooftop coworking space and boutique long-stay destination for digital nomads in San Vicente, Palawan. Starlink internet, guest kitchen, and long-stay suites." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e224b429-c095-4744-9a4e-7df0adad55b2/id-preview-e36a280e--6003d037-f970-40f1-bfea-1f10cb300992.lovable.app-1784255206148.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e224b429-c095-4744-9a4e-7df0adad55b2/id-preview-e36a280e--6003d037-f970-40f1-bfea-1f10cb300992.lovable.app-1784255206148.png" },
     ],
     links: [
       {
