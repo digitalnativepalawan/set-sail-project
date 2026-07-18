@@ -66,7 +66,7 @@ export function RoomsSection() {
         {/* Room Tab Switcher (Professional, Minimal Segmented Controller) */}
         <div className="mb-12 flex justify-center">
           <div className="inline-flex rounded-full border border-[#26221C]/10 bg-white p-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-            {roomData.map((room, idx) => (
+            {rooms.map((room, idx) => (
               <button
                 key={room.id}
                 onClick={() => handleRoomTabChange(idx)}
@@ -78,11 +78,6 @@ export function RoomsSection() {
                 )}
               >
                 <span>{room.name}</span>
-                {idx === 1 && (
-                  <span className="hidden items-center gap-0.5 rounded-full bg-[#C6A15B]/15 px-2 py-0.5 text-[10px] font-semibold text-[#8A6B32] sm:inline-flex">
-                    Ocean View
-                  </span>
-                )}
               </button>
             ))}
           </div>
@@ -108,39 +103,40 @@ export function RoomsSection() {
           <div className="space-y-12 lg:col-span-2">
             
             {/* Image Slider */}
-            <div className="group relative overflow-hidden rounded-3xl border border-[#26221C]/8 bg-white shadow-md aspect-[16/10]">
-              <img
-                src={activeRoom.images[activeImgIdx]}
-                alt={`${activeRoom.name} View ${activeImgIdx + 1}`}
-                className="h-full w-full object-cover transition-all duration-500"
+            <div className="group relative overflow-hidden rounded-3xl border border-[#26221C]/8 bg-white shadow-md">
+              <ImagePlaceholder
+                mediaId={activeImages[activeImgIdx]}
+                label={activeRoom.name}
+                className="aspect-[16/10] w-full"
+                rounded="rounded-3xl"
               />
-              
-              {/* Prev/Next Navigation Controls */}
-              <button
-                onClick={handlePrevImg}
-                className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-[#26221C] shadow-md backdrop-blur-sm transition-all hover:bg-white active:scale-95 lg:opacity-0 lg:group-hover:opacity-100"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
-                onClick={handleNextImg}
-                className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-[#26221C] shadow-md backdrop-blur-sm transition-all hover:bg-white active:scale-95 lg:opacity-0 lg:group-hover:opacity-100"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-
-              {/* Dots indicator */}
-              <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5 rounded-full bg-black/25 px-3 py-1.5 backdrop-blur-sm">
-                {activeRoom.images.map((_, idx) => (
+              {activeImages.length > 1 && (
+                <>
                   <button
-                    key={idx}
-                    onClick={() => setActiveImgIdx(idx)}
-                    className={`h-2 w-2 rounded-full transition-all ${
-                      idx === activeImgIdx ? "bg-white w-4" : "bg-white/50"
-                    }`}
-                  />
-                ))}
-              </div>
+                    onClick={handlePrevImg}
+                    className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-[#26221C] shadow-md backdrop-blur-sm transition-all hover:bg-white active:scale-95 lg:opacity-0 lg:group-hover:opacity-100"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={handleNextImg}
+                    className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-[#26221C] shadow-md backdrop-blur-sm transition-all hover:bg-white active:scale-95 lg:opacity-0 lg:group-hover:opacity-100"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                  <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5 rounded-full bg-black/25 px-3 py-1.5 backdrop-blur-sm">
+                    {activeImages.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveImgIdx(idx)}
+                        className={`h-2 w-2 rounded-full transition-all ${
+                          idx === activeImgIdx ? "bg-white w-4" : "bg-white/50"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Room Description */}
@@ -148,7 +144,7 @@ export function RoomsSection() {
               <h2 className="font-serif text-2xl font-light text-[#26221C]">Room Description</h2>
               <div className="h-0.5 w-12 bg-[#C6A15B]/40" />
               <div className="space-y-3 text-sm leading-relaxed text-[#26221C]/75">
-                {activeRoom.description.map((line, li) => (
+                {activeRoom.description.split("\n").filter(Boolean).map((line, li) => (
                   <p key={li}>{line}</p>
                 ))}
               </div>
