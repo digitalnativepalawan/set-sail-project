@@ -6,19 +6,8 @@ import { Card } from "@/components/ui";
 import { getIcon } from "@/lib/icons";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { Reveal } from "./Reveal";
+import { ImagePlaceholder } from "./ImagePlaceholder";
 import { cn } from "@/utils/cn";
-
-// Define strict details for our premier accommodation options
-interface RoomDetail {
-  id: string;
-  name: string;
-  capacity: string;
-  size: string;
-  view: string;
-  price: string;
-  images: string[];
-  description: string[];
-}
 
 export function RoomsSection() {
   const { data } = useCms();
@@ -27,54 +16,21 @@ export function RoomsSection() {
   const contact = data.settings.contact;
   const whatsapp = data.settings.whatsapp;
 
-  // Curated room details matching both image uploads and specs
-  const roomData: RoomDetail[] = [
-    {
-      id: "room_uno",
-      name: "Superior Room UNO",
-      capacity: "2 Adults",
-      size: "24sqm",
-      view: "City: View",
-      price: "$42",
-      images: [
-        "/images/room-uno-main.jpg",
-        "/images/room-uno-details.jpg",
-        "/images/room-uno-bed.jpg"
-      ],
-      description: [
-        "The largest room, with sofa and coffee table, large screen TV, air conditioning, large bright windows, and an elegant and welcoming style.",
-        "• Private bathroom.",
-        "• Non-smoking room.",
-        "• Immediate confirmation."
-      ]
-    },
-    {
-      id: "room_due",
-      name: "Standard Room DUE",
-      capacity: "2 Adults",
-      size: "20sqm",
-      view: "Ocean: View",
-      price: "$32",
-      images: [
-        "/images/room-due-main.jpg",
-        "/images/room-due-minibar.jpg",
-        "/images/room-tre-main.jpg" // backfill placeholder
-      ],
-      description: [
-        "Double bedroom with king size bed, TV, air conditioning, large bright windows, and an elegant and welcoming style.",
-        "• Private bathroom.",
-        "• Non-smoking room.",
-        "• Immediate confirmation."
-      ]
-    }
-  ];
+  // Pull rooms straight from the CMS so the admin Stay editor drives what
+  // renders here. Each room's imageKey is a Media Library reference resolved
+  // below to the actual uploaded URL.
+  const rooms = [...(data.homepage.rooms || [])]
+    .filter((r) => r.visible !== false)
+    .sort((a, b) => a.order - b.order);
 
-  // Active selected room tab state
+  const resolveMediaUrl = (mediaId?: string) =>
+    mediaId ? data.media.find((m) => m.id === mediaId)?.url : undefined;
+
   const [activeRoomIdx, setActiveRoomIdx] = useState(0);
-  const activeRoom = roomData[activeRoomIdx];
-
-  // Carousel/Slide state for current active room images
   const [activeImgIdx, setActiveImgIdx] = useState(0);
+
+  const activeRoom = rooms[activeRoomIdx];
+  const activeImages = activeRoom ? [activeRoom.imageKey].filter(Boolean) : [];
 
   // Guest booking widget state
   const [checkIn, setCheckIn] = useState("");
@@ -82,23 +38,26 @@ export function RoomsSection() {
   const [guests, setGuests] = useState("2");
 
   const handleNextImg = () => {
-    setActiveImgIdx((prev) => (prev + 1) % activeRoom.images.length);
+    if (activeImages.length === 0) return;
+    setActiveImgIdx((prev) => (prev + 1) % activeImages.length);
   };
 
   const handlePrevImg = () => {
-    setActiveImgIdx((prev) => (prev - 1 + activeRoom.images.length) % activeRoom.images.length);
+    if (activeImages.length === 0) return;
+    setActiveImgIdx((prev) => (prev - 1 + activeImages.length) % activeImages.length);
   };
 
   const handleRoomTabChange = (idx: number) => {
     setActiveRoomIdx(idx);
-    setActiveImgIdx(0); // reset image index on room switch
+    setActiveImgIdx(0);
   };
+
+  if (!activeRoom) return null;
 
   const bookingText = `Hi! I'd like to book ${activeRoom.name} from ${checkIn || "dd/mm/yyyy"} to ${checkOut || "dd/mm/yyyy"} for ${guests} guests.`;
   const bookingLink = buildWhatsAppLink(whatsapp, contact, { message: bookingText });
 
-  // Exclude active rooms from the "Other Rooms" listing below to keep it clean
-  const otherRooms = data.homepage.rooms.filter((r) => r.name !== activeRoom.name);
+  const otherRooms = rooms.filter((r) => r.id !== activeRoom.id);
 
   return (
     <section id="accommodation" className="bg-[#FAF6EF] py-20 lg:py-28">
