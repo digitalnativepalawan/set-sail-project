@@ -28,7 +28,7 @@ export default function HomepageEditor() {
         tabs={[
           { id: "hero", label: "Hero" },
           { id: "features", label: "Features" },
-          { id: "focus", label: "Focus" },
+          { id: "focus", label: "The Vibe" },
           { id: "order", label: "Order" },
           { id: "cta", label: "CTA" },
         ]}
