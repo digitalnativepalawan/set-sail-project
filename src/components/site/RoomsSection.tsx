@@ -6,19 +6,8 @@ import { Card } from "@/components/ui";
 import { getIcon } from "@/lib/icons";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { Reveal } from "./Reveal";
+import { ImagePlaceholder } from "./ImagePlaceholder";
 import { cn } from "@/utils/cn";
-
-// Define strict details for our premier accommodation options
-interface RoomDetail {
-  id: string;
-  name: string;
-  capacity: string;
-  size: string;
-  view: string;
-  price: string;
-  images: string[];
-  description: string[];
-}
 
 export function RoomsSection() {
   const { data } = useCms();
@@ -27,54 +16,18 @@ export function RoomsSection() {
   const contact = data.settings.contact;
   const whatsapp = data.settings.whatsapp;
 
-  // Curated room details matching both image uploads and specs
-  const roomData: RoomDetail[] = [
-    {
-      id: "room_uno",
-      name: "Superior Room UNO",
-      capacity: "2 Adults",
-      size: "24sqm",
-      view: "City: View",
-      price: "$42",
-      images: [
-        "/images/room-uno-main.jpg",
-        "/images/room-uno-details.jpg",
-        "/images/room-uno-bed.jpg"
-      ],
-      description: [
-        "The largest room, with sofa and coffee table, large screen TV, air conditioning, large bright windows, and an elegant and welcoming style.",
-        "• Private bathroom.",
-        "• Non-smoking room.",
-        "• Immediate confirmation."
-      ]
-    },
-    {
-      id: "room_due",
-      name: "Standard Room DUE",
-      capacity: "2 Adults",
-      size: "20sqm",
-      view: "Ocean: View",
-      price: "$32",
-      images: [
-        "/images/room-due-main.jpg",
-        "/images/room-due-minibar.jpg",
-        "/images/room-tre-main.jpg" // backfill placeholder
-      ],
-      description: [
-        "Double bedroom with king size bed, TV, air conditioning, large bright windows, and an elegant and welcoming style.",
-        "• Private bathroom.",
-        "• Non-smoking room.",
-        "• Immediate confirmation."
-      ]
-    }
-  ];
+  // Pull rooms straight from the CMS so the admin Stay editor drives what
+  // renders here. Each room's imageKey is a Media Library reference resolved
+  // below to the actual uploaded URL.
+  const rooms = [...(data.homepage.rooms || [])]
+    .filter((r) => r.visible !== false)
+    .sort((a, b) => a.order - b.order);
 
-  // Active selected room tab state
   const [activeRoomIdx, setActiveRoomIdx] = useState(0);
-  const activeRoom = roomData[activeRoomIdx];
-
-  // Carousel/Slide state for current active room images
   const [activeImgIdx, setActiveImgIdx] = useState(0);
+
+  const activeRoom = rooms[activeRoomIdx];
+  const activeImages = activeRoom ? [activeRoom.imageKey].filter(Boolean) : [];
 
   // Guest booking widget state
   const [checkIn, setCheckIn] = useState("");
@@ -82,23 +35,26 @@ export function RoomsSection() {
   const [guests, setGuests] = useState("2");
 
   const handleNextImg = () => {
-    setActiveImgIdx((prev) => (prev + 1) % activeRoom.images.length);
+    if (activeImages.length === 0) return;
+    setActiveImgIdx((prev) => (prev + 1) % activeImages.length);
   };
 
   const handlePrevImg = () => {
-    setActiveImgIdx((prev) => (prev - 1 + activeRoom.images.length) % activeRoom.images.length);
+    if (activeImages.length === 0) return;
+    setActiveImgIdx((prev) => (prev - 1 + activeImages.length) % activeImages.length);
   };
 
   const handleRoomTabChange = (idx: number) => {
     setActiveRoomIdx(idx);
-    setActiveImgIdx(0); // reset image index on room switch
+    setActiveImgIdx(0);
   };
+
+  if (!activeRoom) return null;
 
   const bookingText = `Hi! I'd like to book ${activeRoom.name} from ${checkIn || "dd/mm/yyyy"} to ${checkOut || "dd/mm/yyyy"} for ${guests} guests.`;
   const bookingLink = buildWhatsAppLink(whatsapp, contact, { message: bookingText });
 
-  // Exclude active rooms from the "Other Rooms" listing below to keep it clean
-  const otherRooms = data.homepage.rooms.filter((r) => r.name !== activeRoom.name);
+  const otherRooms = rooms.filter((r) => r.id !== activeRoom.id);
 
   return (
     <section id="accommodation" className="bg-[#FAF6EF] py-20 lg:py-28">
@@ -107,7 +63,7 @@ export function RoomsSection() {
         {/* Room Tab Switcher (Professional, Minimal Segmented Controller) */}
         <div className="mb-12 flex justify-center">
           <div className="inline-flex rounded-full border border-[#26221C]/10 bg-white p-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-            {roomData.map((room, idx) => (
+            {rooms.map((room, idx) => (
               <button
                 key={room.id}
                 onClick={() => handleRoomTabChange(idx)}
@@ -119,11 +75,6 @@ export function RoomsSection() {
                 )}
               >
                 <span>{room.name}</span>
-                {idx === 1 && (
-                  <span className="hidden items-center gap-0.5 rounded-full bg-[#C6A15B]/15 px-2 py-0.5 text-[10px] font-semibold text-[#8A6B32] sm:inline-flex">
-                    Ocean View
-                  </span>
-                )}
               </button>
             ))}
           </div>
@@ -149,39 +100,40 @@ export function RoomsSection() {
           <div className="space-y-12 lg:col-span-2">
             
             {/* Image Slider */}
-            <div className="group relative overflow-hidden rounded-3xl border border-[#26221C]/8 bg-white shadow-md aspect-[16/10]">
-              <img
-                src={activeRoom.images[activeImgIdx]}
-                alt={`${activeRoom.name} View ${activeImgIdx + 1}`}
-                className="h-full w-full object-cover transition-all duration-500"
+            <div className="group relative overflow-hidden rounded-3xl border border-[#26221C]/8 bg-white shadow-md">
+              <ImagePlaceholder
+                mediaId={activeImages[activeImgIdx]}
+                label={activeRoom.name}
+                className="aspect-[16/10] w-full"
+                rounded="rounded-3xl"
               />
-              
-              {/* Prev/Next Navigation Controls */}
-              <button
-                onClick={handlePrevImg}
-                className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-[#26221C] shadow-md backdrop-blur-sm transition-all hover:bg-white active:scale-95 lg:opacity-0 lg:group-hover:opacity-100"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
-                onClick={handleNextImg}
-                className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-[#26221C] shadow-md backdrop-blur-sm transition-all hover:bg-white active:scale-95 lg:opacity-0 lg:group-hover:opacity-100"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-
-              {/* Dots indicator */}
-              <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5 rounded-full bg-black/25 px-3 py-1.5 backdrop-blur-sm">
-                {activeRoom.images.map((_, idx) => (
+              {activeImages.length > 1 && (
+                <>
                   <button
-                    key={idx}
-                    onClick={() => setActiveImgIdx(idx)}
-                    className={`h-2 w-2 rounded-full transition-all ${
-                      idx === activeImgIdx ? "bg-white w-4" : "bg-white/50"
-                    }`}
-                  />
-                ))}
-              </div>
+                    onClick={handlePrevImg}
+                    className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-[#26221C] shadow-md backdrop-blur-sm transition-all hover:bg-white active:scale-95 lg:opacity-0 lg:group-hover:opacity-100"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={handleNextImg}
+                    className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-[#26221C] shadow-md backdrop-blur-sm transition-all hover:bg-white active:scale-95 lg:opacity-0 lg:group-hover:opacity-100"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                  <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5 rounded-full bg-black/25 px-3 py-1.5 backdrop-blur-sm">
+                    {activeImages.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveImgIdx(idx)}
+                        className={`h-2 w-2 rounded-full transition-all ${
+                          idx === activeImgIdx ? "bg-white w-4" : "bg-white/50"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Room Description */}
@@ -189,7 +141,7 @@ export function RoomsSection() {
               <h2 className="font-serif text-2xl font-light text-[#26221C]">Room Description</h2>
               <div className="h-0.5 w-12 bg-[#C6A15B]/40" />
               <div className="space-y-3 text-sm leading-relaxed text-[#26221C]/75">
-                {activeRoom.description.map((line, li) => (
+                {activeRoom.description.split("\n").filter(Boolean).map((line, li) => (
                   <p key={li}>{line}</p>
                 ))}
               </div>
@@ -303,13 +255,12 @@ export function RoomsSection() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {otherRooms.map((room) => (
                 <div key={room.id} className="group overflow-hidden rounded-2xl border border-[#26221C]/8 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
-                  <div className="aspect-[16/10] overflow-hidden bg-[#FAF6EF]">
-                    <img
-                      src={room.imageKey}
-                      alt={room.name}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  </div>
+                  <ImagePlaceholder
+                    mediaId={room.imageKey}
+                    label={room.name}
+                    className="aspect-[16/10] w-full"
+                    rounded="rounded-none"
+                  />
                   <div className="p-5">
                     <h3 className="font-serif text-lg font-medium text-[#26221C] group-hover:text-[#8A6B32] transition-colors">{room.name}</h3>
                     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#26221C]/50">
