@@ -23,9 +23,6 @@ export function RoomsSection() {
     .filter((r) => r.visible !== false)
     .sort((a, b) => a.order - b.order);
 
-  const resolveMediaUrl = (mediaId?: string) =>
-    mediaId ? data.media.find((m) => m.id === mediaId)?.url : undefined;
-
   const [activeRoomIdx, setActiveRoomIdx] = useState(0);
   const [activeImgIdx, setActiveImgIdx] = useState(0);
 
