@@ -258,13 +258,12 @@ export function RoomsSection() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {otherRooms.map((room) => (
                 <div key={room.id} className="group overflow-hidden rounded-2xl border border-[#26221C]/8 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
-                  <div className="aspect-[16/10] overflow-hidden bg-[#FAF6EF]">
-                    <img
-                      src={room.imageKey}
-                      alt={room.name}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  </div>
+                  <ImagePlaceholder
+                    mediaId={room.imageKey}
+                    label={room.name}
+                    className="aspect-[16/10] w-full"
+                    rounded="rounded-none"
+                  />
                   <div className="p-5">
                     <h3 className="font-serif text-lg font-medium text-[#26221C] group-hover:text-[#8A6B32] transition-colors">{room.name}</h3>
                     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#26221C]/50">
