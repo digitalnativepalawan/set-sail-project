@@ -53,6 +53,16 @@ interface TalaLead {
   created_at: string;
 }
 
+interface TalaAuditRow {
+  id: string;
+  intent: string;
+  urgency: string;
+  department: string;
+  guest_message: string;
+  tools_used: string[];
+  created_at: string;
+}
+
 const DB_ROW_KEY = "marina_terrace_payload";
 
 export default function TalaManager() {
@@ -99,6 +109,37 @@ export default function TalaManager() {
   useEffect(() => {
     void loadLeads();
   }, [loadLeads]);
+
+  // ---- Agent activity — the audit node's output (tala_audit_log).
+  const [auditRows, setAuditRows] = useState<TalaAuditRow[] | null>(null);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [loadingAudit, setLoadingAudit] = useState(true);
+
+  const loadAudit = useCallback(async () => {
+    setLoadingAudit(true);
+    setAuditError(null);
+    try {
+      if (!isSupabaseConnected() || !supabase) {
+        setAuditRows([]);
+        return;
+      }
+      const { data: rows, error } = await supabase
+        .from("tala_audit_log")
+        .select("id, intent, urgency, department, guest_message, tools_used, created_at")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      setAuditRows((rows as TalaAuditRow[]) ?? []);
+    } catch (e) {
+      setAuditError(e instanceof Error ? e.message : "Couldn't load agent activity.");
+    } finally {
+      setLoadingAudit(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadAudit();
+  }, [loadAudit]);
 
   const loadModels = async () => {
     setLoadingModels(true);
@@ -226,6 +267,7 @@ export default function TalaManager() {
     });
     if (reply) voice.speak(reply);
     void loadLeads(); // pick up a new lead if the test triggered log_interested_guest
+    void loadAudit(); // pick up this turn's classify + audit entry
   };
 
   const chooseVoice = async (voiceId: string) => {
@@ -578,6 +620,26 @@ export default function TalaManager() {
           </div>
         )}
 
+        {chat.lastRun && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-[#26221C]/40">Agent graph:</span>
+            <Badge className="bg-[#26221C]/8 text-[#26221C]/70">
+              intent: {chat.lastRun.classification.intent}
+            </Badge>
+            <Badge className="bg-[#26221C]/8 text-[#26221C]/70">
+              urgency: {chat.lastRun.classification.urgency}
+            </Badge>
+            <Badge className="bg-[#26221C]/8 text-[#26221C]/70">
+              dept: {chat.lastRun.classification.department}
+            </Badge>
+            {chat.lastRun.toolsUsed.length > 0 && (
+              <Badge className="bg-green-100 text-green-700">
+                tools: {chat.lastRun.toolsUsed.join(", ")}
+              </Badge>
+            )}
+          </div>
+        )}
+
         {voice.status === "speaking" && (
           <p className="mt-3 flex items-center gap-2 text-xs text-[#26221C]/50">
             <Volume2 className="h-3.5 w-3.5 animate-pulse text-[#C6A15B]" /> Speaking…
@@ -639,6 +701,78 @@ export default function TalaManager() {
                     </span>
                   </div>
                   {lead.note && <p className="mt-1 text-sm text-[#26221C]/70">{lead.note}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="mb-6 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="font-serif text-lg text-[#26221C]">Agent activity</p>
+            <p className="mt-1 text-sm text-[#26221C]/55">
+              The agent graph's audit trail — every completed turn's classification and which tools
+              ran (KAPWA's "log every significant action" rule, applied to TALA). Proof the classify
+              → agent → audit pipeline is real, not just a chat completion.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void loadAudit()}
+            disabled={loadingAudit}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loadingAudit ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
+
+        {auditError && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{auditError}</p>
+          </div>
+        )}
+
+        {!auditError && auditRows && auditRows.length === 0 && (
+          <p className="rounded-xl border border-dashed border-[#26221C]/15 bg-white/50 p-6 text-center text-sm text-[#26221C]/50">
+            No activity logged yet. Run a test above or have a conversation on the live site.
+          </p>
+        )}
+
+        {auditRows && auditRows.length > 0 && (
+          <div className="space-y-2">
+            {auditRows.map((row) => (
+              <div
+                key={row.id}
+                className="flex items-start gap-3 rounded-xl border border-[#26221C]/10 bg-[#FAF6EF] p-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge className="bg-[#26221C]/8 text-[#26221C]/70">{row.intent}</Badge>
+                    <Badge
+                      className={
+                        row.urgency === "high" || row.urgency === "urgent"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-[#26221C]/8 text-[#26221C]/70"
+                      }
+                    >
+                      {row.urgency}
+                    </Badge>
+                    <Badge className="bg-[#26221C]/8 text-[#26221C]/70">{row.department}</Badge>
+                    {row.tools_used?.length > 0 && (
+                      <Badge className="bg-green-100 text-green-700">
+                        {row.tools_used.join(", ")}
+                      </Badge>
+                    )}
+                    <span className="text-xs text-[#26221C]/40">
+                      {new Date(row.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  {row.guest_message && (
+                    <p className="mt-1 truncate text-sm text-[#26221C]/70">{row.guest_message}</p>
+                  )}
                 </div>
               </div>
             ))}
