@@ -41,7 +41,13 @@ export function TalaWidget() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const chat = useTalaChat();
-  const voice = useTalaVoice({ defaultVoiceId: data.settings.tala.voiceId || undefined });
+  const voice = useTalaVoice({
+    defaultVoiceId: data.settings.tala.voiceId || undefined,
+    provider: data.settings.tala.voiceProvider,
+    apiKey: data.settings.tala.apiKey || undefined,
+    ttsModelId: data.settings.tala.ttsModelId || undefined,
+    ttsVoiceId: data.settings.tala.ttsVoiceId || undefined,
+  });
   const knowledge = useTalaKnowledge();
 
   const systemPrompt = useMemo(

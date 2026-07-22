@@ -342,6 +342,18 @@ export interface TalaSettings {
   apiKey: string;
   /** Kokoro voice id (e.g. "af_heart") used as the site-wide default for every visitor. */
   voiceId: string;
+  /**
+   * Which engine actually speaks. "kokoro" = free, in-browser (default).
+   * "openrouter" = hosted TTS model via OpenRouter (same apiKey above,
+   * no separate account) — real cost, but no local-model download lag.
+   */
+  voiceProvider: "kokoro" | "openrouter";
+  /** OpenRouter TTS model id, e.g. "mistralai/voxtral-mini-tts-2603". Only used when voiceProvider is "openrouter". */
+  ttsModelId: string;
+  /** Human-readable label shown in admin, captured at selection time. */
+  ttsModelLabel: string;
+  /** Voice id for the chosen TTS model — each model defines its own set (e.g. OpenAI: "nova", Voxtral: "en_paul_happy"). */
+  ttsVoiceId: string;
   /** ISO timestamp of the last time an admin changed this — drives the "synced" indicator. */
   updatedAt: string;
 }

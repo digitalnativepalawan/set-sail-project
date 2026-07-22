@@ -1,17 +1,61 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { TALA_DEFAULT_VOICE, TALA_KOKORO_MODEL, TALA_STORAGE } from "./talaConfig";
+import {
+  OPENROUTER_TTS_ENDPOINT,
+  TALA_DEFAULT_VOICE,
+  TALA_KOKORO_MODEL,
+  TALA_STORAGE,
+} from "./talaConfig";
 
 // ---------------------------------------------------------------------------
 // TALA's voice.
 //
-// Primary engine: Kokoro-82M (Apache-2.0) running fully in the browser via
+// Default engine: Kokoro-82M (Apache-2.0) running fully in the browser via
 // kokoro-js — a genuinely humanlike female voice with zero API cost. The
-// ~80 MB model downloads once and is cached by the browser afterwards.
+// ~80 MB model downloads once and is cached by the browser afterwards, but
+// that first download is real, felt latency before she can speak at all.
 //
-// Fallback engine: the built-in Web Speech synthesis voices. Used while
-// Kokoro is still downloading (so TALA is never mute) and on devices where
-// WASM/WebGPU inference isn't practical.
+// Optional engine: OpenRouter's hosted TTS API (/api/v1/audio/speech) — the
+// same key/billing already used for TALA's chat brain, no separate voice
+// provider needed. No local model to download, so no first-load lag; real
+// per-character cost, but genuinely humanlike hosted voices (MiniMax,
+// GPT-4o Mini TTS, Voxtral, etc.), admin-selectable in Admin -> TALA.
+//
+// Universal fallback: the built-in Web Speech synthesis voices, used only
+// if the chosen engine fails or (for Kokoro) is still downloading.
 // ---------------------------------------------------------------------------
+
+async function synthesizeOpenRouterTts(
+  text: string,
+  config: { apiKey: string; model: string; voice: string },
+): Promise<Blob> {
+  const res = await fetch(OPENROUTER_TTS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`,
+      "HTTP-Referer": window.location.origin,
+      "X-Title": "TALA - San Vicente Concierge",
+    },
+    body: JSON.stringify({
+      model: config.model,
+      input: text,
+      voice: config.voice,
+      response_format: "mp3",
+    }),
+  });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const errBody = await res.json();
+      message = errBody?.error?.message || message;
+    } catch {
+      /* error responses are JSON per the API's own docs; ignore parse failures */
+    }
+    throw new Error(message);
+  }
+  const bytes = await res.arrayBuffer();
+  return new Blob([bytes], { type: "audio/mpeg" });
+}
 
 // Kokoro's generate() resolves a RawAudio: raw Float32 PCM samples + sample
 // rate, not an encoded file. Its own .toBlob() helper wraps that as 32-bit
@@ -57,7 +101,7 @@ function encodePCM16Wav(samples: Float32Array, sampleRate: number): Blob {
   return new Blob([buffer], { type: "audio/wav" });
 }
 
-export type TalaVoiceEngine = "kokoro" | "browser" | "none";
+export type TalaVoiceEngine = "kokoro" | "openrouter" | "browser" | "none";
 export type TalaVoiceStatus = "idle" | "loading" | "speaking";
 
 /**
@@ -156,10 +200,21 @@ export interface UseTalaVoiceOptions {
    * choice (stored in their own localStorage) always wins after that.
    */
   defaultVoiceId?: string;
+  /** "openrouter" only takes effect when apiKey + ttsModelId + ttsVoiceId are all set; otherwise falls back to "kokoro". */
+  provider?: "kokoro" | "openrouter";
+  /** OpenRouter API key (same one used for chat) — required for the openrouter provider. */
+  apiKey?: string;
+  /** OpenRouter TTS model id, e.g. "mistralai/voxtral-mini-tts-2603". */
+  ttsModelId?: string;
+  /** Voice id for the chosen TTS model (each model defines its own set). */
+  ttsVoiceId?: string;
 }
 
 export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
   const siteDefaultVoice = options?.defaultVoiceId || TALA_DEFAULT_VOICE;
+  const openRouterReady = Boolean(options?.apiKey && options?.ttsModelId && options?.ttsVoiceId);
+  const provider: "kokoro" | "openrouter" =
+    options?.provider === "openrouter" && openRouterReady ? "openrouter" : "kokoro";
   const [enabled, setEnabledState] = useState<boolean>(() => {
     try {
       return localStorage.getItem(TALA_STORAGE.voiceEnabled) !== "off";
@@ -184,6 +239,15 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
   const queueRef = useRef<string[]>([]);
   const speakingRef = useRef(false);
   const generationRef = useRef(0); // bumped on stop() to cancel stale playback
+  // playQueue/speak are stable useCallbacks (empty deps) but need the latest
+  // provider/config on every call — kept in refs rather than closed-over state.
+  const providerRef = useRef(provider);
+  providerRef.current = provider;
+  const orConfigRef = useRef<{ apiKey: string; model: string; voice: string } | null>(null);
+  orConfigRef.current =
+    provider === "openrouter"
+      ? { apiKey: options!.apiKey!, model: options!.ttsModelId!, voice: options!.ttsVoiceId! }
+      : null;
   // While Kokoro is still downloading, hold speech instead of using the
   // robotic browser fallback — that fallback is what "TALA sounds robotic"
   // reports actually were. If the download outlasts the cap, speak anyway.
@@ -231,8 +295,12 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
     setStatus((s) => (s === "speaking" ? "idle" : s));
   }, []);
 
-  // Kick off the Kokoro download in the background the first time voice is on.
+  // Kick off the Kokoro download in the background the first time voice is on
+  // — but only when Kokoro is actually the engine in use. The whole point of
+  // the OpenRouter provider is no local model download, so skip this
+  // entirely rather than wasting 80 MB of bandwidth nobody will use.
   useEffect(() => {
+    if (provider !== "kokoro") return;
     if (!enabled || kokoroRef.current || kokoroLoading.current) return;
     if (typeof window === "undefined") return;
     kokoroLoading.current = true;
@@ -277,7 +345,7 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
         }
       }
     })();
-  }, [enabled]);
+  }, [enabled, provider]);
 
   const playQueue = useCallback(async () => {
     if (speakingRef.current) return;
@@ -285,24 +353,35 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
     const generation = generationRef.current;
     setStatus("speaking");
 
+    const playBlob = async (blob: Blob) => {
+      if (generation !== generationRef.current) return;
+      const url = URL.createObjectURL(blob);
+      await new Promise<void>((resolve) => {
+        const el = new Audio(url);
+        audioRef.current = el;
+        el.onended = () => resolve();
+        el.onerror = () => resolve();
+        el.play().catch(() => resolve());
+      });
+      URL.revokeObjectURL(url);
+    };
+
     while (queueRef.current.length && generation === generationRef.current) {
       const chunk = queueRef.current.shift()!;
-      const kokoro = kokoroRef.current;
 
-      if (kokoro) {
+      if (providerRef.current === "openrouter" && orConfigRef.current) {
         try {
-          const audio = await kokoro.generate(chunk, { voice: voiceIdRef.current });
+          const blob = await synthesizeOpenRouterTts(chunk, orConfigRef.current);
+          await playBlob(blob);
+          continue;
+        } catch (e) {
+          console.warn("[TALA] OpenRouter TTS failed, falling back to browser voice.", e);
+        }
+      } else if (kokoroRef.current) {
+        try {
+          const audio = await kokoroRef.current.generate(chunk, { voice: voiceIdRef.current });
           if (generation !== generationRef.current) break;
-          const blob = encodePCM16Wav(audio.audio, audio.sampling_rate);
-          const url = URL.createObjectURL(blob);
-          await new Promise<void>((resolve) => {
-            const el = new Audio(url);
-            audioRef.current = el;
-            el.onended = () => resolve();
-            el.onerror = () => resolve();
-            el.play().catch(() => resolve());
-          });
-          URL.revokeObjectURL(url);
+          await playBlob(encodePCM16Wav(audio.audio, audio.sampling_rate));
           continue;
         } catch (e) {
           console.warn("[TALA] Kokoro generation failed, falling back.", e);
@@ -342,7 +421,8 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
       // Natural voice still downloading? Hold the reply instead of speaking
       // it robotically — the wait cap keeps a slow connection from muting
       // TALA forever. Once cached (second visit onward) this never waits.
-      if (!kokoroRef.current && kokoroLoading.current) {
+      // Irrelevant for the OpenRouter provider: there's no local download.
+      if (providerRef.current === "kokoro" && !kokoroRef.current && kokoroLoading.current) {
         pendingSpeakRef.current = true;
         setStatus("loading");
         waitTimerRef.current = setTimeout(() => {
@@ -372,9 +452,9 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
   return {
     enabled,
     setEnabled,
-    engine,
+    engine: provider === "openrouter" ? "openrouter" : engine,
     status,
-    loadProgress,
+    loadProgress: provider === "openrouter" ? null : loadProgress,
     voiceId,
     setVoiceId,
     speak,

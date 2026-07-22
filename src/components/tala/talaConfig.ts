@@ -21,6 +21,14 @@ export const TALA_SUPABASE_ANON_KEY = SUPABASE_KEY ?? null;
 export const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 /**
+ * OpenRouter's hosted text-to-speech endpoint — same key/billing as the chat
+ * brain, no separate provider account needed. Optional upgrade from the free
+ * in-browser Kokoro voice: real hosted models (MiniMax, GPT-4o Mini TTS,
+ * Voxtral, etc.) with no local model download, so no first-load speech lag.
+ */
+export const OPENROUTER_TTS_ENDPOINT = "https://openrouter.ai/api/v1/audio/speech";
+
+/**
  * Free OpenRouter models, tried in order until one answers. Free-tier IDs
  * churn over time — keep this list fresh from https://openrouter.ai/models?q=free
  * The edge function shares this list; update both together.

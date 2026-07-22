@@ -21,6 +21,7 @@ import { Button, Card, Field, Input, Select, Switch, Badge } from "@/components/
 import { PageHeader } from "../shared/PageHeader";
 import {
   fetchOpenRouterModels,
+  fetchOpenRouterVoiceModels,
   formatPrice,
   type OpenRouterModel,
 } from "../shared/openRouterModels";
@@ -78,6 +79,15 @@ export default function TalaManager() {
   );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(true);
+
+  // ---- Voice models — OpenRouter's hosted TTS catalog (paid, same key as
+  // the chat brain). Kokoro (free, in-browser) is the default; this is the
+  // opt-in upgrade for both lower latency and hosted-voice quality.
+  const [ttsModels, setTtsModels] = useState<OpenRouterModel[] | null>(null);
+  const [ttsLoadError, setTtsLoadError] = useState<string | null>(null);
+  const [loadingTtsModels, setLoadingTtsModels] = useState(true);
+  const [ttsVoiceIdInput, setTtsVoiceIdInput] = useState(tala.ttsVoiceId);
+
   const [sync, setSync] = useState<SyncState>("idle");
   const [keyInput, setKeyInput] = useState(tala.apiKey);
   const [showKey, setShowKey] = useState(false);
@@ -158,6 +168,24 @@ export default function TalaManager() {
       setLoadingModels(false);
     }
   };
+
+  const loadTtsModels = async () => {
+    setLoadingTtsModels(true);
+    setTtsLoadError(null);
+    try {
+      setTtsModels(await fetchOpenRouterVoiceModels());
+    } catch (e) {
+      setTtsLoadError(
+        e instanceof Error ? e.message : "Could not reach OpenRouter's voice model list right now.",
+      );
+    } finally {
+      setLoadingTtsModels(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadTtsModels();
+  }, []);
 
   useEffect(() => {
     void loadModels();
@@ -246,7 +274,13 @@ export default function TalaManager() {
   // ---- Live test — runs the exact same pipeline a visitor's browser would,
   // right here in admin, so there's no back-and-forth to the public site.
   const chat = useTalaChat();
-  const voice = useTalaVoice({ defaultVoiceId: tala.voiceId || undefined });
+  const voice = useTalaVoice({
+    defaultVoiceId: tala.voiceId || undefined,
+    provider: tala.voiceProvider,
+    apiKey: tala.apiKey || undefined,
+    ttsModelId: tala.ttsModelId || undefined,
+    ttsVoiceId: tala.ttsVoiceId || undefined,
+  });
   const knowledge = useTalaKnowledge();
   const systemPrompt = useMemo(
     () => buildTalaSystemPrompt(data, knowledge.entries),
@@ -283,6 +317,38 @@ export default function TalaManager() {
     const chosen = TALA_KOKORO_VOICES.find((v) => v.id === voiceId);
     notify(`TALA's voice set to ${chosen?.label.split(" — ")[0] || voiceId}`);
     await confirmSynced((cloudTala) => cloudTala?.voiceId === voiceId);
+  };
+
+  const chooseVoiceProvider = async (provider: "kokoro" | "openrouter") => {
+    voice.stop();
+    patchTala((t) => ({ ...t, voiceProvider: provider, updatedAt: new Date().toISOString() }));
+    notify(
+      provider === "kokoro"
+        ? "Voice set back to free (Kokoro, in-browser)"
+        : "Voice set to OpenRouter — real cost, no local download",
+    );
+    await confirmSynced((cloudTala) => cloudTala?.voiceProvider === provider);
+  };
+
+  const chooseTtsModel = async (modelId: string) => {
+    voice.stop();
+    const model = ttsModels?.find((m) => m.id === modelId);
+    patchTala((t) => ({
+      ...t,
+      ttsModelId: modelId,
+      ttsModelLabel: model?.name ?? "",
+      updatedAt: new Date().toISOString(),
+    }));
+    if (modelId) notify(`Voice model set to ${model?.name ?? modelId}`);
+    await confirmSynced((cloudTala) => cloudTala?.ttsModelId === modelId);
+  };
+
+  const saveTtsVoiceId = async () => {
+    const trimmed = ttsVoiceIdInput.trim();
+    voice.stop();
+    patchTala((t) => ({ ...t, ttsVoiceId: trimmed, updatedAt: new Date().toISOString() }));
+    notify(trimmed ? `Voice ID set to "${trimmed}"` : "Voice ID cleared");
+    await confirmSynced((cloudTala) => cloudTala?.ttsVoiceId === trimmed);
   };
 
   return (
@@ -523,59 +589,166 @@ export default function TalaManager() {
           <div>
             <p className="font-serif text-lg text-[#26221C]">Voice</p>
             <p className="mt-1 text-sm text-[#26221C]/55">
-              Runs entirely in the visitor's browser (Kokoro, free, no API). Pick one below, then
-              use "Test TALA Live" further down to hear it before it goes live for everyone.
+              Kokoro runs free, entirely in the visitor's browser — but the ~80 MB model has to
+              download before she can speak the first time. OpenRouter's hosted voices use the same
+              key as your chat brain above: real per-character cost, but no download wait.
             </p>
           </div>
           <Badge
             className={
-              voice.engine === "kokoro"
+              voice.engine === "kokoro" || voice.engine === "openrouter"
                 ? "bg-green-100 text-green-700"
                 : "bg-amber-100 text-amber-700"
             }
           >
-            {voice.engine === "kokoro"
-              ? "Loaded"
-              : voice.loadProgress !== null
-                ? `Loading ${voice.loadProgress}%`
-                : "Not loaded yet"}
+            {voice.engine === "openrouter"
+              ? "OpenRouter — ready"
+              : voice.engine === "kokoro"
+                ? "Kokoro — loaded"
+                : voice.loadProgress !== null
+                  ? `Loading ${voice.loadProgress}%`
+                  : "Not loaded yet"}
           </Badge>
         </div>
-        <Field
-          label="Voice"
-          hint="American and British voices, ranked by Kokoro's own quality grade."
-        >
-          <Select value={tala.voiceId} onChange={(e) => void chooseVoice(e.target.value)}>
-            <optgroup label="American — Female">
-              {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("af_")).map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="British — Female">
-              {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("bf_")).map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="American — Male">
-              {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("am_")).map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="British — Male">
-              {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("bm_")).map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
-                </option>
-              ))}
-            </optgroup>
-          </Select>
-        </Field>
+
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-[#FAF6EF] p-1">
+          <button
+            onClick={() => void chooseVoiceProvider("kokoro")}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+              tala.voiceProvider === "kokoro"
+                ? "bg-white text-[#26221C] shadow-sm"
+                : "text-[#26221C]/50 hover:text-[#26221C]"
+            }`}
+          >
+            Kokoro — free, in-browser
+          </button>
+          <button
+            onClick={() => void chooseVoiceProvider("openrouter")}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+              tala.voiceProvider === "openrouter"
+                ? "bg-white text-[#26221C] shadow-sm"
+                : "text-[#26221C]/50 hover:text-[#26221C]"
+            }`}
+          >
+            OpenRouter — paid, no lag
+          </button>
+        </div>
+
+        {tala.voiceProvider === "kokoro" && (
+          <Field
+            label="Voice"
+            hint="American and British voices, ranked by Kokoro's own quality grade."
+          >
+            <Select value={tala.voiceId} onChange={(e) => void chooseVoice(e.target.value)}>
+              <optgroup label="American — Female">
+                {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("af_")).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="British — Female">
+                {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("bf_")).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="American — Male">
+                {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("am_")).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="British — Male">
+                {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("bm_")).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </optgroup>
+            </Select>
+          </Field>
+        )}
+
+        {tala.voiceProvider === "openrouter" && (
+          <div className="space-y-4">
+            {!tala.apiKey && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  No API key set yet — add one in the OpenRouter API Key card above. OpenRouter TTS
+                  uses that same key.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-[#26221C]">Voice model</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadTtsModels}
+                disabled={loadingTtsModels}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loadingTtsModels ? "animate-spin" : ""}`} />{" "}
+                Refresh
+              </Button>
+            </div>
+
+            {ttsLoadError && (
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>{ttsLoadError}</p>
+              </div>
+            )}
+
+            <Field
+              label="Model"
+              hint="Hosted TTS models on OpenRouter — MiniMax, GPT-4o Mini TTS, Voxtral, and others."
+            >
+              <Select
+                value={tala.ttsModelId}
+                onChange={(e) => void chooseTtsModel(e.target.value)}
+                disabled={loadingTtsModels}
+              >
+                <option value="">— Choose a voice model —</option>
+                {ttsModels?.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} — {formatPrice(m)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field
+              label="Voice ID"
+              hint='Each model defines its own voice set — check its OpenRouter page. Examples: OpenAI uses "nova" or "alloy"; Voxtral uses "en_paul_happy".'
+            >
+              <div className="flex gap-2">
+                <Input
+                  value={ttsVoiceIdInput}
+                  onChange={(e) => setTtsVoiceIdInput(e.target.value)}
+                  placeholder="e.g. nova"
+                />
+                <Button
+                  onClick={() => void saveTtsVoiceId()}
+                  disabled={ttsVoiceIdInput === tala.ttsVoiceId}
+                >
+                  Save
+                </Button>
+              </div>
+            </Field>
+
+            {tala.ttsModelId && !tala.ttsVoiceId && (
+              <p className="text-xs text-amber-700">
+                Pick a voice ID above — TALA will fall back to the standard browser voice until one
+                is set.
+              </p>
+            )}
+          </div>
+        )}
       </Card>
 
       <Card className="mb-6 p-6">
