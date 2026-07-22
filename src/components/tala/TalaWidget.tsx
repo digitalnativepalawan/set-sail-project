@@ -16,6 +16,7 @@ import { buildTalaSystemPrompt, talaGreeting } from "./talaPersona";
 import { useTalaChat, getDevApiKey, setDevApiKey } from "./useTalaChat";
 import { useTalaVoice } from "./useTalaVoice";
 import { useSpeechInput } from "./useSpeechInput";
+import { useTalaKnowledge } from "./useTalaKnowledge";
 import { TALA_KOKORO_VOICES } from "./talaConfig";
 
 // ---------------------------------------------------------------------------
@@ -41,8 +42,12 @@ export function TalaWidget() {
 
   const chat = useTalaChat();
   const voice = useTalaVoice({ defaultVoiceId: data.settings.tala.voiceId || undefined });
+  const knowledge = useTalaKnowledge();
 
-  const systemPrompt = useMemo(() => buildTalaSystemPrompt(data), [data]);
+  const systemPrompt = useMemo(
+    () => buildTalaSystemPrompt(data, knowledge.entries),
+    [data, knowledge.entries],
+  );
   const greeting = useMemo(() => talaGreeting(data), [data]);
 
   const submit = async (text: string) => {

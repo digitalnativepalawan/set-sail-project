@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   AlertCircle,
   AlertTriangle,
+  BookOpen,
   CheckCircle2,
   Circle,
   Eye,
@@ -27,6 +29,7 @@ import type { CmsData, TalaSettings } from "@/types/cms";
 import { useTalaChat } from "@/components/tala/useTalaChat";
 import { useTalaVoice } from "@/components/tala/useTalaVoice";
 import { buildTalaSystemPrompt } from "@/components/tala/talaPersona";
+import { useTalaKnowledge } from "@/components/tala/useTalaKnowledge";
 import { TALA_KOKORO_VOICES } from "@/components/tala/talaConfig";
 
 // ---------------------------------------------------------------------------
@@ -244,7 +247,11 @@ export default function TalaManager() {
   // right here in admin, so there's no back-and-forth to the public site.
   const chat = useTalaChat();
   const voice = useTalaVoice({ defaultVoiceId: tala.voiceId || undefined });
-  const systemPrompt = useMemo(() => buildTalaSystemPrompt(data), [data]);
+  const knowledge = useTalaKnowledge();
+  const systemPrompt = useMemo(
+    () => buildTalaSystemPrompt(data, knowledge.entries),
+    [data, knowledge.entries],
+  );
   const [testMessage, setTestMessage] = useState(
     "What rooms do you have and what's the wifi like?",
   );
@@ -283,6 +290,13 @@ export default function TalaManager() {
       <PageHeader
         title="TALA — AI Voice Concierge"
         description="Pick which AI model powers TALA's answers. The voice itself (Kokoro, in-browser) is separate and always free."
+        actions={
+          <Link to="/admin/tala/knowledge">
+            <Button variant="outline" size="sm">
+              <BookOpen className="h-4 w-4" /> Knowledge Base ({knowledge.entries.length})
+            </Button>
+          </Link>
+        }
       />
 
       {/* Readiness strip — everything you'd otherwise check on the live site */}

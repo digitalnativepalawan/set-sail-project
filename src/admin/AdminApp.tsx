@@ -18,6 +18,7 @@ import FaqManager from "./pages/FaqManager";
 import ContactManager from "./pages/ContactManager";
 import WhatsAppManager from "./pages/WhatsAppManager";
 import TalaManager from "./pages/TalaManager";
+import TalaKnowledgeManager from "./pages/TalaKnowledgeManager";
 import SeoManager from "./pages/SeoManager";
 import AppearanceManager from "./pages/AppearanceManager";
 import SettingsManager from "./pages/SettingsManager";
@@ -53,6 +54,7 @@ export default function AdminApp() {
         <Route path="contact" element={<ContactManager />} />
         <Route path="whatsapp" element={<WhatsAppManager />} />
         <Route path="tala" element={<TalaManager />} />
+        <Route path="tala/knowledge" element={<TalaKnowledgeManager />} />
         <Route path="seo" element={<SeoManager />} />
         <Route path="appearance" element={<AppearanceManager />} />
         <Route path="settings" element={<SettingsManager />} />

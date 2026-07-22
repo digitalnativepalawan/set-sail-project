@@ -1,4 +1,5 @@
 import type { CmsData } from "@/types/cms";
+import { knowledgeForPrompt, type TalaKnowledgeEntry } from "./talaKnowledge";
 
 // ---------------------------------------------------------------------------
 // TALA's persona — adapted from the KAPWA Resort OS system prompt
@@ -13,7 +14,7 @@ function cleanLines(lines: Array<string | null | undefined | false>): string {
   return lines.filter(Boolean).join("\n");
 }
 
-export function buildTalaSystemPrompt(cms: CmsData): string {
+export function buildTalaSystemPrompt(cms: CmsData, knowledge: TalaKnowledgeEntry[] = []): string {
   const today = new Date().toISOString().slice(0, 10);
   const { homepage, pricing, faqs, settings } = cms;
   const contact = settings.contact;
@@ -47,6 +48,7 @@ export function buildTalaSystemPrompt(cms: CmsData): string {
     .join(", ");
 
   const speed = homepage.speed;
+  const knowledgeBlock = knowledgeForPrompt(knowledge);
   const faqBlock = [...faqs]
     .sort((a, b) => a.order - b.order)
     .slice(0, 10)
@@ -93,6 +95,10 @@ export function buildTalaSystemPrompt(cms: CmsData): string {
     rooms ? `## Rooms\n${rooms}` : null,
     "",
     packages ? `## Plans & pricing\n${packages}` : null,
+    "",
+    knowledgeBlock
+      ? `## Knowledge base\n${knowledgeBlock}\n(Any "[price removed]" note means that fact's price is intentionally stripped — always quote pricing from the Plans & pricing / Rooms sections above, never from here.)`
+      : null,
     "",
     "## Contact",
     primaryWhatsApp ? `- WhatsApp (bookings): ${primaryWhatsApp}` : null,
