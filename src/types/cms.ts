@@ -331,6 +331,15 @@ export interface TalaSettings {
   modelLabel: string;
   /** Whether the selected model is one of OpenRouter's free-tier models. */
   isFreeModel: boolean;
+  /**
+   * OpenRouter API key, entered directly in admin for fast iteration while
+   * building. Stored the same way the WhatsApp chatbot's apiKey field is
+   * (see WhatsAppSettings.chatbot.apiKey below) — plain text in CMS data,
+   * which every site visitor's browser can read. Fine for a building/testing
+   * key you don't mind rotating; move to the Supabase Edge Function secret
+   * (never exposed) before treating this as production-final.
+   */
+  apiKey: string;
   /** ISO timestamp of the last time an admin changed this — drives the "synced" indicator. */
   updatedAt: string;
 }

@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Info, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 import { useCms } from "@/context/CmsContext";
 import { useToast } from "@/context/ToastContext";
-import { Button, Card, Field, Select, Switch, Badge } from "@/components/ui";
+import { Button, Card, Field, Input, Select, Switch, Badge } from "@/components/ui";
 import { PageHeader } from "../shared/PageHeader";
 import {
   fetchOpenRouterModels,
@@ -13,13 +22,17 @@ import { supabase, isSupabaseConnected } from "@/lib/supabase";
 import type { CmsData, TalaSettings } from "@/types/cms";
 
 // ---------------------------------------------------------------------------
-// TALA settings — admin picks which OpenRouter model TALA's brain uses.
+// TALA settings — admin picks the OpenRouter model AND (for fast iteration
+// while building) can paste an API key straight in here.
 //
-// Only the model choice is stored here. It is intentionally NOT where the
-// OpenRouter API key goes: this page's data (like all CMS content) is
-// readable by anyone visiting the public site, so a secret key here would
-// leak to every visitor. The key stays a Supabase Edge Function secret,
-// set separately once TALA is ready to go fully live.
+// Trade-off, stated plainly: this page's data is the same data the public
+// site loads to render itself, so anything saved here — including this key
+// — is technically readable by anyone who inspects the site's network
+// requests. That's the same pattern this codebase already uses for the
+// WhatsApp chatbot's API key field (see WhatsAppManager.tsx), so it's not a
+// new risk class, just the same one applied to TALA. Fine for a key you're
+// fine rotating during active building; swap it for the private Supabase
+// Edge Function secret (never exposed) before this is production-final.
 // ---------------------------------------------------------------------------
 
 type SyncState = "idle" | "saving" | "verifying" | "synced" | "error";
@@ -37,6 +50,8 @@ export default function TalaManager() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(true);
   const [sync, setSync] = useState<SyncState>("idle");
+  const [keyInput, setKeyInput] = useState(tala.apiKey);
+  const [showKey, setShowKey] = useState(false);
 
   const loadModels = async () => {
     setLoadingModels(true);
@@ -118,6 +133,12 @@ export default function TalaManager() {
     notify(on ? "TALA enabled on the site" : "TALA hidden from the site");
   };
 
+  const saveKey = () => {
+    const trimmed = keyInput.trim();
+    patchTala((t) => ({ ...t, apiKey: trimmed, updatedAt: new Date().toISOString() }));
+    notify(trimmed ? "API key saved — TALA is live" : "API key cleared");
+  };
+
   return (
     <div>
       <PageHeader
@@ -139,6 +160,50 @@ export default function TalaManager() {
             </div>
           </div>
           <Switch checked={tala.enabled} onChange={toggleEnabled} />
+        </div>
+      </Card>
+
+      <Card className="mb-6 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="font-serif text-lg text-[#26221C]">OpenRouter API Key</p>
+            <p className="mt-1 text-sm text-[#26221C]/55">
+              Paste your key here to make TALA work right now, no deploy step needed. Fast for
+              building — see the note below on why this isn't where a final production key should
+              live.
+            </p>
+          </div>
+          <Badge
+            className={tala.apiKey ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}
+          >
+            {tala.apiKey ? "Key set — TALA is live" : "No key yet"}
+          </Badge>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <Field label="API Key">
+              <div className="relative">
+                <Input
+                  type={showKey ? "text" : "password"}
+                  value={keyInput}
+                  onChange={(e) => setKeyInput(e.target.value)}
+                  placeholder="sk-or-v1-…"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey((s) => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[#26221C]/40 hover:text-[#26221C]"
+                  aria-label={showKey ? "Hide key" : "Show key"}
+                >
+                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </Field>
+          </div>
+          <Button onClick={saveKey} disabled={keyInput === tala.apiKey}>
+            Save Key
+          </Button>
         </div>
       </Card>
 
@@ -254,17 +319,22 @@ export default function TalaManager() {
 
       <Card className="p-6">
         <div className="flex items-start gap-2 text-sm text-[#26221C]/70">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#C6A15B]" />
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
           <div>
-            <p className="font-medium text-[#26221C]">Where's the API key?</p>
+            <p className="font-medium text-[#26221C]">Good for building, not for launch day</p>
             <p className="mt-1">
-              On purpose, not here. Every setting on this page is visible to anyone browsing the
-              site, so a real API key can never live in it. Once you're happy with the model choice,
-              the key gets added as a private Supabase secret (
+              The key above is stored in the same data the public site loads to render itself —
+              which means, technically, anyone who opens their browser's network tab while visiting
+              the site could read it. That's an acceptable trade while you're iterating fast and can
+              rotate the key anytime. Before this goes fully public, move it to a private Supabase
+              Edge Function secret (
               <code className="rounded bg-[#26221C]/5 px-1.5 py-0.5 text-xs">
                 OPENROUTER_API_KEY
               </code>
-              ) — that step happens once, separately, and never touches this admin page.
+              ) instead — same model picker above, key never exposed. One command when you're ready:{" "}
+              <code className="rounded bg-[#26221C]/5 px-1.5 py-0.5 text-xs">
+                supabase secrets set OPENROUTER_API_KEY=...
+              </code>
             </p>
           </div>
         </div>

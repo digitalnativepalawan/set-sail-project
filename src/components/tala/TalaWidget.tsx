@@ -50,7 +50,10 @@ export function TalaWidget() {
     if (!trimmed || chat.thinking) return;
     setInput("");
     voice.stop();
-    const reply = await chat.send(trimmed, systemPrompt, data.settings.tala.modelId || undefined);
+    const reply = await chat.send(trimmed, systemPrompt, {
+      model: data.settings.tala.modelId || undefined,
+      adminApiKey: data.settings.tala.apiKey || undefined,
+    });
     if (reply) voice.speak(reply);
   };
 

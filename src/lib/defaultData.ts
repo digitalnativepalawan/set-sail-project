@@ -607,6 +607,7 @@ export function buildDefaultData(): CmsData {
         modelId: "",
         modelLabel: "",
         isFreeModel: true,
+        apiKey: "",
         updatedAt: "",
       },
     },

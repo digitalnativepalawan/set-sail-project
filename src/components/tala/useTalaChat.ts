@@ -108,7 +108,11 @@ export interface UseTalaChat {
   messages: TalaMessage[];
   thinking: boolean;
   error: string | null;
-  send: (text: string, systemPrompt: string, preferredModel?: string) => Promise<string | null>;
+  send: (
+    text: string,
+    systemPrompt: string,
+    options?: { model?: string; adminApiKey?: string },
+  ) => Promise<string | null>;
   reset: () => void;
 }
 
@@ -119,13 +123,18 @@ export function useTalaChat(): UseTalaChat {
   const inFlight = useRef(false);
 
   const send = useCallback(
-    async (text: string, systemPrompt: string, preferredModel?: string): Promise<string | null> => {
+    async (
+      text: string,
+      systemPrompt: string,
+      options?: { model?: string; adminApiKey?: string },
+    ): Promise<string | null> => {
       const trimmed = text.trim();
       if (!trimmed || inFlight.current) return null;
       inFlight.current = true;
       setError(null);
       setThinking(true);
 
+      const preferredModel = options?.model;
       const userMsg: TalaMessage = { id: newId(), role: "user", content: trimmed };
       let history: TalaMessage[] = [];
       setMessages((prev) => {
@@ -139,10 +148,13 @@ export function useTalaChat(): UseTalaChat {
       ];
 
       try {
-        const devKey = getDevApiKey();
+        // Priority: key entered in Admin → TALA (works instantly, no deploy
+        // needed) → device-local dev key (building on this browser only) →
+        // Supabase edge function (production path, key stays server-side).
+        const key = options?.adminApiKey || getDevApiKey();
         let reply: string;
-        if (devKey) {
-          reply = await askOpenRouterDirect(wire, devKey, preferredModel);
+        if (key) {
+          reply = await askOpenRouterDirect(wire, key, preferredModel);
         } else {
           reply = await askEdgeFunction(wire, preferredModel);
         }
