@@ -2,6 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer, WhatsAppFloat } from "@/components/site/CtaFooter";
+import { TalaWidget } from "@/components/tala/TalaWidget";
 import { useCms } from "@/context/CmsContext";
 
 export default function PublicLayout() {
@@ -14,7 +15,8 @@ export default function PublicLayout() {
 
   useEffect(() => {
     document.title = data.settings.seo.homeTitle || data.settings.seo.siteTitle;
-    const meta = document.querySelector('meta[name="description"]') || document.createElement("meta");
+    const meta =
+      document.querySelector('meta[name="description"]') || document.createElement("meta");
     meta.setAttribute("name", "description");
     meta.setAttribute("content", data.settings.seo.homeDescription);
     if (!meta.parentElement) document.head.appendChild(meta);
@@ -26,6 +28,7 @@ export default function PublicLayout() {
       <Outlet />
       <Footer />
       <WhatsAppFloat />
+      <TalaWidget />
     </div>
   );
 }

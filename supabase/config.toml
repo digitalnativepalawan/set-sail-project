@@ -1,1 +1,4 @@
 project_id = "nfirbrpnmgsrvoomtokn"
+
+[functions.tala-chat]
+verify_jwt = false
