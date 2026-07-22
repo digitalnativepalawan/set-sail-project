@@ -175,6 +175,12 @@ export function useTalaChat(): UseTalaChat {
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
+  // Authoritative copy of the conversation. React state updaters are NOT
+  // guaranteed to run synchronously at the setMessages() call site, so
+  // building the outgoing request from inside one silently dropped the
+  // user's newest message whenever React deferred the updater — the model
+  // then answered a conversation containing only the system prompt.
+  const messagesRef = useRef<TalaMessage[]>([]);
 
   const send = useCallback(
     async (
@@ -190,11 +196,9 @@ export function useTalaChat(): UseTalaChat {
 
       const preferredModel = options?.model;
       const userMsg: TalaMessage = { id: newId(), role: "user", content: trimmed };
-      let history: TalaMessage[] = [];
-      setMessages((prev) => {
-        history = [...prev, userMsg];
-        return history;
-      });
+      const history: TalaMessage[] = [...messagesRef.current, userMsg];
+      messagesRef.current = history;
+      setMessages(history);
 
       let wire: WireMessage[] = [
         { role: "system", content: systemPrompt },
@@ -234,7 +238,11 @@ export function useTalaChat(): UseTalaChat {
         const finalText = reply.content?.trim();
         if (!finalText) throw new Error("TALA didn't have a reply.");
 
-        setMessages((prev) => [...prev, { id: newId(), role: "assistant", content: finalText }]);
+        messagesRef.current = [
+          ...messagesRef.current,
+          { id: newId(), role: "assistant", content: finalText },
+        ];
+        setMessages(messagesRef.current);
         return finalText;
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Something went wrong.";
@@ -249,6 +257,7 @@ export function useTalaChat(): UseTalaChat {
   );
 
   const reset = useCallback(() => {
+    messagesRef.current = [];
     setMessages([]);
     setError(null);
   }, []);

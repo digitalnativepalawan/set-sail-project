@@ -60,9 +60,41 @@ function encodePCM16Wav(samples: Float32Array, sampleRate: number): Blob {
 export type TalaVoiceEngine = "kokoro" | "browser" | "none";
 export type TalaVoiceStatus = "idle" | "loading" | "speaking";
 
+/**
+ * Rewrite text the way a person would say it out loud. The TTS phonemizer
+ * reads "PHP 3,500", "Mbps" and raw URLs literally, which is most of what
+ * made TALA's pronunciation sound off — normalize those before synthesis.
+ */
+function normalizeForSpeech(text: string): string {
+  return (
+    text
+      // currency: "PHP 3,500" / "₱3,500" → "3,500 pesos"; stray "PHP" → "pesos"
+      .replace(/(?:PHP|₱)\s?([\d,]+(?:\.\d+)?)/gi, "$1 pesos")
+      .replace(/\bPHP\b/g, "pesos")
+      .replace(/\$\s?([\d,]+(?:\.\d+)?)/g, "$1 dollars")
+      // units & tech shorthand
+      .replace(/\b(\d+)\s?Mbps\b/gi, "$1 megabits per second")
+      .replace(/\b(\d+)\s?Gbps\b/gi, "$1 gigabits per second")
+      .replace(/\b(\d+)\s?(?:sqm|m²)\b/gi, "$1 square meters")
+      .replace(/\b24\/7\b/g, "twenty-four seven")
+      // links & handles: never read a URL character by character
+      .replace(/https?:\/\/wa\.me\/\S+/gi, "our WhatsApp")
+      .replace(/https?:\/\/\S+/gi, "our website")
+      .replace(/\bwww\.\S+/gi, "our website")
+      // common abbreviations
+      .replace(/\be\.g\.\s?/gi, "for example, ")
+      .replace(/\betc\.?\b/gi, "and so on")
+      .replace(/\bvs\.?\b/gi, "versus")
+      // punctuation the phonemizer mangles → natural pauses
+      .replace(/\s[—–]\s?/g, ", ")
+      .replace(/&/g, " and ")
+      .replace(/\s?\/\s?/g, " or ")
+  );
+}
+
 /** Split text into speakable chunks so long replies start playing sooner. */
 function splitSentences(text: string): string[] {
-  const cleaned = text
+  const cleaned = normalizeForSpeech(text)
     .replace(/[*_#`~>]/g, "") // strip any markdown the model sneaks in
     .replace(/\s+/g, " ")
     .trim();
@@ -152,6 +184,13 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
   const queueRef = useRef<string[]>([]);
   const speakingRef = useRef(false);
   const generationRef = useRef(0); // bumped on stop() to cancel stale playback
+  // While Kokoro is still downloading, hold speech instead of using the
+  // robotic browser fallback — that fallback is what "TALA sounds robotic"
+  // reports actually were. If the download outlasts the cap, speak anyway.
+  const pendingSpeakRef = useRef(false);
+  const waitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playQueueRef = useRef<(() => Promise<void>) | null>(null);
+  const KOKORO_WAIT_CAP_MS = 45000;
   const voiceIdRef = useRef(voiceId);
   voiceIdRef.current = voiceId;
 
@@ -177,6 +216,11 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
     generationRef.current += 1;
     queueRef.current = [];
     speakingRef.current = false;
+    pendingSpeakRef.current = false;
+    if (waitTimerRef.current) {
+      clearTimeout(waitTimerRef.current);
+      waitTimerRef.current = null;
+    }
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -222,6 +266,15 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
       } finally {
         setLoadProgress(null);
         kokoroLoading.current = false;
+        // Flush any reply that was held back waiting for the natural voice.
+        if (pendingSpeakRef.current) {
+          pendingSpeakRef.current = false;
+          if (waitTimerRef.current) {
+            clearTimeout(waitTimerRef.current);
+            waitTimerRef.current = null;
+          }
+          void playQueueRef.current?.();
+        }
       }
     })();
   }, [enabled]);
@@ -275,6 +328,10 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
     if (generation === generationRef.current) setStatus("idle");
   }, []);
 
+  // The load effect (defined above) needs to flush held speech when the
+  // download finishes; it runs before playQueue exists, so it goes via a ref.
+  playQueueRef.current = playQueue;
+
   const speak = useCallback(
     (text: string) => {
       if (!enabled) return;
@@ -282,6 +339,20 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
       if (!chunks.length) return;
       stop();
       queueRef.current = chunks;
+      // Natural voice still downloading? Hold the reply instead of speaking
+      // it robotically — the wait cap keeps a slow connection from muting
+      // TALA forever. Once cached (second visit onward) this never waits.
+      if (!kokoroRef.current && kokoroLoading.current) {
+        pendingSpeakRef.current = true;
+        setStatus("loading");
+        waitTimerRef.current = setTimeout(() => {
+          if (pendingSpeakRef.current) {
+            pendingSpeakRef.current = false;
+            void playQueue();
+          }
+        }, KOKORO_WAIT_CAP_MS);
+        return;
+      }
       void playQueue();
     },
     [enabled, stop, playQueue],
