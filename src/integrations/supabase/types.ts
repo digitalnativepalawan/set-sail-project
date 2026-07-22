@@ -32,6 +32,102 @@ export type Database = {
         }
         Relationships: []
       }
+      tala_audit_log: {
+        Row: {
+          created_at: string
+          department: string
+          guest_message: string
+          id: string
+          intent: string
+          reply_preview: string
+          tools_used: string[]
+          urgency: string
+        }
+        Insert: {
+          created_at?: string
+          department?: string
+          guest_message?: string
+          id?: string
+          intent?: string
+          reply_preview?: string
+          tools_used?: string[]
+          urgency?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string
+          guest_message?: string
+          id?: string
+          intent?: string
+          reply_preview?: string
+          tools_used?: string[]
+          urgency?: string
+        }
+        Relationships: []
+      }
+      tala_knowledge: {
+        Row: {
+          body: string
+          created_at: string
+          enabled: boolean
+          id: string
+          label: string
+          sort_order: number
+          tags: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label: string
+          sort_order?: number
+          tags?: string
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string
+          sort_order?: number
+          tags?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tala_leads: {
+        Row: {
+          contact: string
+          created_at: string
+          id: string
+          name: string
+          note: string
+          source: string
+        }
+        Insert: {
+          contact?: string
+          created_at?: string
+          id?: string
+          name?: string
+          note?: string
+          source?: string
+        }
+        Update: {
+          contact?: string
+          created_at?: string
+          id?: string
+          name?: string
+          note?: string
+          source?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
