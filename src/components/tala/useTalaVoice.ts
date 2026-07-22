@@ -264,10 +264,10 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
         // so we use it unconditionally rather than opportunistically trying
         // WebGPU first.
         //
-        // dtype: prefer q4f16 (smaller download, faster CPU inference, no
-        // audible quality loss for a concierge voice); fall back to q8 if a
-        // browser/runtime rejects the newer quantization.
-        const loadWith = (dtype: "q4f16" | "q8") =>
+        // dtype: q8 gives the most humanlike output on CPU. Lower quants
+        // (q4/q4f16) load faster but audibly degrade the voice into a
+        // robotic tone, so we stick with q8.
+        const loadWith = (dtype: "q8") =>
           KokoroTTS.from_pretrained(TALA_KOKORO_MODEL, {
             dtype,
             device: "wasm",
@@ -277,13 +277,7 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
               }
             },
           });
-        let tts: KokoroInstance;
-        try {
-          tts = (await loadWith("q4f16")) as unknown as KokoroInstance;
-        } catch (fastErr) {
-          console.warn("[TALA] Kokoro q4f16 unavailable, falling back to q8.", fastErr);
-          tts = (await loadWith("q8")) as unknown as KokoroInstance;
-        }
+        const tts = (await loadWith("q8")) as unknown as KokoroInstance;
         kokoroRef.current = tts;
         setEngine("kokoro");
       } catch (e) {
