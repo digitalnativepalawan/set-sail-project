@@ -135,11 +135,18 @@ async function askOpenRouterDirect(
   throw new Error(lastError || "All free models are busy right now.");
 }
 
-/** Production path: Supabase Edge Function proxy (key lives in Supabase secrets). */
-async function askEdgeFunction(
-  messages: WireMessage[],
+/**
+ * Production path: Supabase Edge Function, running a real LangGraph
+ * StateGraph (classify -> agent -> tools -> audit) server-side — see
+ * supabase/functions/tala-chat/index.ts. The whole graph resolves in this
+ * one request: unlike the direct-to-OpenRouter path, the client never sees
+ * intermediate tool_calls or drives a loop itself. It just gets the final
+ * answer plus the classify/audit telemetry the graph produced.
+ */
+async function askEdgeFunctionGraph(
+  plainMessages: { role: "system" | "user" | "assistant"; content: string }[],
   preferredModel?: string,
-): Promise<AssistantReply> {
+): Promise<{ reply: string; classification: TalaClassification; toolsUsed: string[] }> {
   if (!TALA_CHAT_ENDPOINT) throw new Error("Supabase is not configured.");
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (TALA_SUPABASE_ANON_KEY) {
@@ -149,20 +156,19 @@ async function askEdgeFunction(
   const res = await fetch(TALA_CHAT_ENDPOINT, {
     method: "POST",
     headers,
-    // Tool schemas are NOT sent here — the edge function only trusts its own
-    // hardcoded copy (see supabase/functions/tala-chat/index.ts), not
-    // anything a client could supply.
-    body: JSON.stringify({ messages, model: preferredModel || undefined }),
+    body: JSON.stringify({ messages: plainMessages, model: preferredModel || undefined }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     throw new Error(data?.error || `TALA service error (HTTP ${res.status})`);
   }
-  const message = data?.message as AssistantReply | undefined;
-  if (!message || (!message.content && !message.tool_calls?.length)) {
-    throw new Error("TALA returned an empty reply.");
-  }
-  return message;
+  const reply = typeof data?.reply === "string" ? data.reply.trim() : "";
+  if (!reply) throw new Error("TALA returned an empty reply.");
+  return {
+    reply,
+    classification: data?.classification ?? classifyHeuristically(""),
+    toolsUsed: Array.isArray(data?.toolsUsed) ? data.toolsUsed : [],
+  };
 }
 
 /**
@@ -257,62 +263,78 @@ export function useTalaChat(): UseTalaChat {
         // needed) → device-local dev key (building on this browser only) →
         // Supabase edge function (production path, key stays server-side).
         const key = options?.adminApiKey || getDevApiKey();
-        const requestReply = (msgs: WireMessage[]) =>
-          key
-            ? askOpenRouterDirect(msgs, key, preferredModel)
-            : askEdgeFunction(msgs, preferredModel);
+        let finalText: string;
+        let classification: TalaClassification;
+        let toolsUsed: string[];
 
-        // Graph node 1 — classify. Fired in parallel with the answer so it
-        // costs no latency; only used for audit + admin telemetry. On the
-        // edge-function path (no browser key) skip the extra call and use
-        // the deterministic keyword rules directly.
-        const classifyPromise: Promise<TalaClassification> = key
-          ? classifyMessage(trimmed, key, preferredModel).catch(() =>
-              classifyHeuristically(trimmed),
-            )
-          : Promise.resolve(classifyHeuristically(trimmed));
+        if (key) {
+          // Direct-to-OpenRouter path: LangGraph.js is a server-side
+          // framework and this call happens from the browser with an
+          // exposed key, so it can't run the real graph — this hand-rolled
+          // equivalent (classify in parallel + client-driven tool loop)
+          // stands in for fast local iteration only.
+          const requestReply = (msgs: WireMessage[]) =>
+            askOpenRouterDirect(msgs, key, preferredModel);
 
-        // Graph node 2 — agent: the tool-calling loop.
-        const toolsUsed: string[] = [];
-        let reply = await requestReply(wire);
-        let hops = 0;
-        while (reply.tool_calls?.length && hops < MAX_TOOL_HOPS) {
-          hops++;
-          wire = [
-            ...wire,
-            { role: "assistant", content: reply.content, tool_calls: reply.tool_calls },
-          ];
-          for (const call of reply.tool_calls) {
-            toolsUsed.push(call.function.name);
-            const result = options?.cms
-              ? await executeTalaTool(
-                  { id: call.id, name: call.function.name, arguments: call.function.arguments },
-                  options.cms,
-                )
-              : { error: "Tool unavailable — no site data loaded." };
-            wire.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+          const classifyPromise = classifyMessage(trimmed, key, preferredModel).catch(() =>
+            classifyHeuristically(trimmed),
+          );
+
+          const hopsUsed: string[] = [];
+          let reply = await requestReply(wire);
+          let hops = 0;
+          while (reply.tool_calls?.length && hops < MAX_TOOL_HOPS) {
+            hops++;
+            wire = [
+              ...wire,
+              { role: "assistant", content: reply.content, tool_calls: reply.tool_calls },
+            ];
+            for (const call of reply.tool_calls) {
+              hopsUsed.push(call.function.name);
+              const result = options?.cms
+                ? await executeTalaTool(
+                    { id: call.id, name: call.function.name, arguments: call.function.arguments },
+                    options.cms,
+                  )
+                : { error: "Tool unavailable — no site data loaded." };
+              wire.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+            }
+            reply = await requestReply(wire);
           }
-          reply = await requestReply(wire);
-        }
 
-        const finalText = reply.content?.trim();
-        if (!finalText) throw new Error("TALA didn't have a reply.");
+          const text = reply.content?.trim();
+          if (!text) throw new Error("TALA didn't have a reply.");
+          finalText = text;
+          toolsUsed = hopsUsed;
+          classification = await classifyPromise;
+          writeAuditEntry({
+            classification,
+            guestMessage: trimmed,
+            replyPreview: finalText,
+            toolsUsed,
+          });
+        } else {
+          // Edge-function path: the real LangGraph StateGraph runs entirely
+          // server-side (classify, agent, tools, audit) and returns the
+          // finished answer in one round trip — nothing left to drive here.
+          const plainHistory = history
+            .slice(-TALA_MAX_HISTORY)
+            .map((m) => ({ role: m.role, content: m.content }));
+          const result = await askEdgeFunctionGraph(
+            [{ role: "system", content: systemPrompt }, ...plainHistory],
+            preferredModel,
+          );
+          finalText = result.reply;
+          classification = result.classification;
+          toolsUsed = result.toolsUsed;
+        }
 
         messagesRef.current = [
           ...messagesRef.current,
           { id: newId(), role: "assistant", content: finalText },
         ];
         setMessages(messagesRef.current);
-
-        // Graph node 3 — audit. Never blocks or breaks the reply.
-        const classification = await classifyPromise;
         setLastRun({ classification, toolsUsed });
-        writeAuditEntry({
-          classification,
-          guestMessage: trimmed,
-          replyPreview: finalText,
-          toolsUsed,
-        });
 
         return finalText;
       } catch (e) {
