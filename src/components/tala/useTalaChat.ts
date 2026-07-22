@@ -60,7 +60,8 @@ async function askOpenRouterDirect(
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
           "HTTP-Referer": window.location.origin,
-          "X-Title": "TALA — San Vicente Concierge",
+          // Header values must be Latin-1 — no em dashes or other non-ASCII characters.
+          "X-Title": "TALA - San Vicente Concierge",
         },
         body: JSON.stringify({ model, messages, temperature: 0.5, max_tokens: 600 }),
       });

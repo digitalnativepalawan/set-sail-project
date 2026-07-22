@@ -3,11 +3,14 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  Circle,
   Eye,
   EyeOff,
   Loader2,
+  PlayCircle,
   RefreshCw,
   Sparkles,
+  Volume2,
 } from "lucide-react";
 import { useCms } from "@/context/CmsContext";
 import { useToast } from "@/context/ToastContext";
@@ -20,6 +23,9 @@ import {
 } from "../shared/openRouterModels";
 import { supabase, isSupabaseConnected } from "@/lib/supabase";
 import type { CmsData, TalaSettings } from "@/types/cms";
+import { useTalaChat } from "@/components/tala/useTalaChat";
+import { useTalaVoice } from "@/components/tala/useTalaVoice";
+import { buildTalaSystemPrompt } from "@/components/tala/talaPersona";
 
 // ---------------------------------------------------------------------------
 // TALA settings — admin picks the OpenRouter model AND (for fast iteration
@@ -139,12 +145,87 @@ export default function TalaManager() {
     notify(trimmed ? "API key saved — TALA is live" : "API key cleared");
   };
 
+  // ---- Live test — runs the exact same pipeline a visitor's browser would,
+  // right here in admin, so there's no back-and-forth to the public site.
+  const chat = useTalaChat();
+  const voice = useTalaVoice();
+  const systemPrompt = useMemo(() => buildTalaSystemPrompt(data), [data]);
+  const [testMessage, setTestMessage] = useState(
+    "What rooms do you have and what's the wifi like?",
+  );
+
+  const lastReply = [...chat.messages].reverse().find((m) => m.role === "assistant");
+  const testState: "idle" | "testing" | "success" | "error" = chat.thinking
+    ? "testing"
+    : chat.error
+      ? "error"
+      : lastReply
+        ? "success"
+        : "idle";
+
+  const runTest = async () => {
+    voice.stop();
+    const reply = await chat.send(testMessage, systemPrompt, {
+      model: tala.modelId || undefined,
+      adminApiKey: tala.apiKey || undefined,
+    });
+    if (reply) voice.speak(reply);
+  };
+
   return (
     <div>
       <PageHeader
         title="TALA — AI Voice Concierge"
         description="Pick which AI model powers TALA's answers. The voice itself (Kokoro, in-browser) is separate and always free."
       />
+
+      {/* Readiness strip — everything you'd otherwise check on the live site */}
+      <div className="mb-6 flex flex-wrap gap-2">
+        <StatusChip
+          tone={tala.apiKey ? "green" : "gray"}
+          label={tala.apiKey ? "API key set" : "No key — using free fallback"}
+        />
+        <StatusChip
+          tone="green"
+          label={
+            tala.modelId
+              ? `Model: ${tala.modelLabel || tala.modelId}`
+              : "Model: automatic free fallback"
+          }
+        />
+        <StatusChip
+          tone={
+            testState === "success"
+              ? "green"
+              : testState === "error"
+                ? "red"
+                : testState === "testing"
+                  ? "amber"
+                  : "gray"
+          }
+          label={
+            testState === "success"
+              ? "Live test passed"
+              : testState === "error"
+                ? "Live test failed"
+                : testState === "testing"
+                  ? "Testing…"
+                  : "Not tested yet"
+          }
+        />
+        <StatusChip
+          tone={voice.engine === "kokoro" ? "green" : voice.engine === "browser" ? "amber" : "gray"}
+          label={
+            voice.engine === "kokoro"
+              ? "Voice ready (natural)"
+              : voice.loadProgress !== null
+                ? `Voice loading… ${voice.loadProgress}%`
+                : voice.engine === "browser"
+                  ? "Voice ready (standard)"
+                  : "Voice not started"
+          }
+        />
+      </div>
 
       <Card className="mb-6 p-6">
         <div className="mb-4 flex items-center justify-between">
@@ -317,6 +398,69 @@ export default function TalaManager() {
         </div>
       </Card>
 
+      <Card className="mb-6 p-6">
+        <div className="mb-4">
+          <p className="font-serif text-lg text-[#26221C]">Test TALA Live</p>
+          <p className="mt-1 text-sm text-[#26221C]/55">
+            Runs the exact same chat + voice pipeline a visitor's browser uses — right here, so you
+            can confirm everything works without opening the site.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <Field label="Test question">
+              <Input
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                placeholder="Ask TALA something a guest would ask…"
+              />
+            </Field>
+          </div>
+          <Button onClick={() => void runTest()} disabled={chat.thinking || !testMessage.trim()}>
+            {chat.thinking ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Testing…
+              </>
+            ) : (
+              <>
+                <PlayCircle className="h-4 w-4" /> Run Test
+              </>
+            )}
+          </Button>
+        </div>
+
+        {chat.error && (
+          <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{chat.error}</p>
+          </div>
+        )}
+
+        {lastReply && (
+          <div className="mt-4 rounded-xl border border-[#26221C]/10 bg-[#FAF6EF] p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#26221C]/45">
+                TALA's reply
+              </p>
+              <button
+                onClick={() => voice.speak(lastReply.content)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#26221C]/15 px-3 py-1 text-xs font-medium text-[#26221C]/70 transition hover:border-[#C6A15B]/50 hover:text-[#C6A15B]"
+              >
+                <Volume2 className="h-3.5 w-3.5" /> Play voice
+              </button>
+            </div>
+            <p className="text-sm leading-relaxed text-[#26221C]">{lastReply.content}</p>
+          </div>
+        )}
+
+        {voice.status === "speaking" && (
+          <p className="mt-3 flex items-center gap-2 text-xs text-[#26221C]/50">
+            <Volume2 className="h-3.5 w-3.5 animate-pulse text-[#C6A15B]" /> Speaking…
+          </p>
+        )}
+      </Card>
+
       <Card className="p-6">
         <div className="flex items-start gap-2 text-sm text-[#26221C]/70">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
@@ -340,5 +484,25 @@ export default function TalaManager() {
         </div>
       </Card>
     </div>
+  );
+}
+
+const CHIP_TONES = {
+  green: "border-green-200 bg-green-50 text-green-700",
+  amber: "border-amber-200 bg-amber-50 text-amber-700",
+  red: "border-red-200 bg-red-50 text-red-700",
+  gray: "border-[#26221C]/10 bg-[#26221C]/5 text-[#26221C]/50",
+} as const;
+
+function StatusChip({ tone, label }: { tone: keyof typeof CHIP_TONES; label: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${CHIP_TONES[tone]}`}
+    >
+      <Circle
+        className={`h-2 w-2 ${tone === "green" ? "fill-current" : "fill-current opacity-60"}`}
+      />
+      {label}
+    </span>
   );
 }
