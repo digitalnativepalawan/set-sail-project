@@ -40,7 +40,7 @@ export function TalaWidget() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const chat = useTalaChat();
-  const voice = useTalaVoice();
+  const voice = useTalaVoice({ defaultVoiceId: data.settings.tala.voiceId || undefined });
 
   const systemPrompt = useMemo(() => buildTalaSystemPrompt(data), [data]);
   const greeting = useMemo(() => talaGreeting(data), [data]);

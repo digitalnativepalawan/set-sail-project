@@ -43,14 +43,35 @@ export const TALA_STORAGE = {
 
 /**
  * Kokoro-82M voices (open source, Apache-2.0). All run in-browser via
- * kokoro-js — no API, no cost. `af_heart` is the most natural female voice.
+ * kokoro-js — no API, no cost. Grades are Kokoro's own published quality
+ * ratings (see node_modules/kokoro-js/README.md). `af_heart` is graded A,
+ * the highest of any voice in the set, and is the default.
  */
 export const TALA_KOKORO_VOICES = [
-  { id: "af_heart", label: "Heart — warm female (default)" },
-  { id: "af_bella", label: "Bella — bright female" },
-  { id: "af_nicole", label: "Nicole — soft female" },
-  { id: "af_aoede", label: "Aoede — calm female" },
-  { id: "bf_emma", label: "Emma — British female" },
+  // American female
+  { id: "af_heart", label: "Heart — American female (grade A, default)" },
+  { id: "af_bella", label: "Bella — American female (grade A-)" },
+  { id: "af_nicole", label: "Nicole — American female (grade B-)" },
+  { id: "af_kore", label: "Kore — American female (grade C+)" },
+  { id: "af_sarah", label: "Sarah — American female (grade C+)" },
+  { id: "af_aoede", label: "Aoede — American female (grade C+)" },
+  { id: "af_alloy", label: "Alloy — American female (grade C)" },
+  { id: "af_nova", label: "Nova — American female (grade C)" },
+  { id: "af_sky", label: "Sky — American female (grade C-)" },
+  { id: "af_jessica", label: "Jessica — American female (grade D)" },
+  { id: "af_river", label: "River — American female (grade D)" },
+  // British female
+  { id: "bf_emma", label: "Emma — British female (grade B-)" },
+  { id: "bf_isabella", label: "Isabella — British female (grade C)" },
+  { id: "bf_alice", label: "Alice — British female (grade D)" },
+  { id: "bf_lily", label: "Lily — British female (grade D)" },
+  // American male
+  { id: "am_fenrir", label: "Fenrir — American male (grade C+)" },
+  { id: "am_michael", label: "Michael — American male (grade C+)" },
+  { id: "am_puck", label: "Puck — American male (grade C+)" },
+  // British male
+  { id: "bm_fable", label: "Fable — British male (grade C)" },
+  { id: "bm_george", label: "George — British male (grade C)" },
 ] as const;
 
 export const TALA_DEFAULT_VOICE = "af_heart";

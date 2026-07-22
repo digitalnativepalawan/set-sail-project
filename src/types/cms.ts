@@ -340,6 +340,8 @@ export interface TalaSettings {
    * (never exposed) before treating this as production-final.
    */
   apiKey: string;
+  /** Kokoro voice id (e.g. "af_heart") used as the site-wide default for every visitor. */
+  voiceId: string;
   /** ISO timestamp of the last time an admin changed this — drives the "synced" indicator. */
   updatedAt: string;
 }

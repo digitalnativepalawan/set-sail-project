@@ -26,6 +26,7 @@ import type { CmsData, TalaSettings } from "@/types/cms";
 import { useTalaChat } from "@/components/tala/useTalaChat";
 import { useTalaVoice } from "@/components/tala/useTalaVoice";
 import { buildTalaSystemPrompt } from "@/components/tala/talaPersona";
+import { TALA_KOKORO_VOICES } from "@/components/tala/talaConfig";
 
 // ---------------------------------------------------------------------------
 // TALA settings — admin picks the OpenRouter model AND (for fast iteration
@@ -161,7 +162,7 @@ export default function TalaManager() {
   // ---- Live test — runs the exact same pipeline a visitor's browser would,
   // right here in admin, so there's no back-and-forth to the public site.
   const chat = useTalaChat();
-  const voice = useTalaVoice();
+  const voice = useTalaVoice({ defaultVoiceId: tala.voiceId || undefined });
   const systemPrompt = useMemo(() => buildTalaSystemPrompt(data), [data]);
   const [testMessage, setTestMessage] = useState(
     "What rooms do you have and what's the wifi like?",
@@ -183,6 +184,14 @@ export default function TalaManager() {
       adminApiKey: tala.apiKey || undefined,
     });
     if (reply) voice.speak(reply);
+  };
+
+  const chooseVoice = async (voiceId: string) => {
+    voice.setVoiceId(voiceId); // swap immediately so "Test TALA Live" uses it too
+    patchTala((t) => ({ ...t, voiceId, updatedAt: new Date().toISOString() }));
+    const chosen = TALA_KOKORO_VOICES.find((v) => v.id === voiceId);
+    notify(`TALA's voice set to ${chosen?.label.split(" — ")[0] || voiceId}`);
+    await confirmSynced((cloudTala) => cloudTala?.voiceId === voiceId);
   };
 
   return (
@@ -409,6 +418,66 @@ export default function TalaManager() {
             </>
           )}
         </div>
+      </Card>
+
+      <Card className="mb-6 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="font-serif text-lg text-[#26221C]">Voice</p>
+            <p className="mt-1 text-sm text-[#26221C]/55">
+              Runs entirely in the visitor's browser (Kokoro, free, no API). Pick one below, then
+              use "Test TALA Live" further down to hear it before it goes live for everyone.
+            </p>
+          </div>
+          <Badge
+            className={
+              voice.engine === "kokoro"
+                ? "bg-green-100 text-green-700"
+                : "bg-amber-100 text-amber-700"
+            }
+          >
+            {voice.engine === "kokoro"
+              ? "Loaded"
+              : voice.loadProgress !== null
+                ? `Loading ${voice.loadProgress}%`
+                : "Not loaded yet"}
+          </Badge>
+        </div>
+        <Field
+          label="Voice"
+          hint="American and British voices, ranked by Kokoro's own quality grade."
+        >
+          <Select value={tala.voiceId} onChange={(e) => void chooseVoice(e.target.value)}>
+            <optgroup label="American — Female">
+              {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("af_")).map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="British — Female">
+              {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("bf_")).map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="American — Male">
+              {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("am_")).map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="British — Male">
+              {TALA_KOKORO_VOICES.filter((v) => v.id.startsWith("bm_")).map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                </option>
+              ))}
+            </optgroup>
+          </Select>
+        </Field>
       </Card>
 
       <Card className="mb-6 p-6">

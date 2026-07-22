@@ -608,6 +608,7 @@ export function buildDefaultData(): CmsData {
         modelLabel: "",
         isFreeModel: true,
         apiKey: "",
+        voiceId: "af_heart",
         updatedAt: "",
       },
     },

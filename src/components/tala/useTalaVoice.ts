@@ -117,7 +117,17 @@ export interface UseTalaVoice {
   stop: () => void;
 }
 
-export function useTalaVoice(): UseTalaVoice {
+export interface UseTalaVoiceOptions {
+  /**
+   * Site-wide default voice, set in Admin → TALA. Used only when this
+   * device has no voice preference of its own yet — an explicit per-visitor
+   * choice (stored in their own localStorage) always wins after that.
+   */
+  defaultVoiceId?: string;
+}
+
+export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
+  const siteDefaultVoice = options?.defaultVoiceId || TALA_DEFAULT_VOICE;
   const [enabled, setEnabledState] = useState<boolean>(() => {
     try {
       return localStorage.getItem(TALA_STORAGE.voiceEnabled) !== "off";
@@ -130,9 +140,9 @@ export function useTalaVoice(): UseTalaVoice {
   const [loadProgress, setLoadProgress] = useState<number | null>(null);
   const [voiceId, setVoiceIdState] = useState<string>(() => {
     try {
-      return localStorage.getItem(TALA_STORAGE.voiceId) || TALA_DEFAULT_VOICE;
+      return localStorage.getItem(TALA_STORAGE.voiceId) || siteDefaultVoice;
     } catch {
-      return TALA_DEFAULT_VOICE;
+      return siteDefaultVoice;
     }
   });
 
