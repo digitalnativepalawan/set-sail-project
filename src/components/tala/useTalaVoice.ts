@@ -100,13 +100,26 @@ function splitSentences(text: string): string[] {
     .trim();
   if (!cleaned) return [];
   const parts = cleaned.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) ?? [cleaned];
-  // Merge very short fragments into their neighbour so speech doesn't stutter.
+  // Merge very short fragments into their neighbour so speech doesn't stutter —
+  // BUT let the first chunk stay short so TALA starts talking sooner. A brief
+  // opener ("Sure —") synthesizes in a fraction of the time of a full sentence.
   const chunks: string[] = [];
   for (const part of parts.map((p) => p.trim()).filter(Boolean)) {
     if (chunks.length && (part.length < 12 || chunks[chunks.length - 1].length < 40)) {
       chunks[chunks.length - 1] += " " + part;
     } else {
       chunks.push(part);
+    }
+  }
+  // If the first chunk is still very long, break off a short opening clause
+  // at the first comma / semicolon / dash so playback can start sooner.
+  if (chunks.length && chunks[0].length > 90) {
+    const first = chunks[0];
+    const splitAt = first.search(/[,;:—–]\s/);
+    if (splitAt > 12 && splitAt < 70) {
+      const head = first.slice(0, splitAt + 1).trim();
+      const tail = first.slice(splitAt + 1).trim();
+      if (head && tail) chunks.splice(0, 1, head, tail);
     }
   }
   return chunks;
