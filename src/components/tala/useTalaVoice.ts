@@ -100,13 +100,26 @@ function splitSentences(text: string): string[] {
     .trim();
   if (!cleaned) return [];
   const parts = cleaned.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) ?? [cleaned];
-  // Merge very short fragments into their neighbour so speech doesn't stutter.
+  // Merge very short fragments into their neighbour so speech doesn't stutter —
+  // BUT let the first chunk stay short so TALA starts talking sooner. A brief
+  // opener ("Sure —") synthesizes in a fraction of the time of a full sentence.
   const chunks: string[] = [];
   for (const part of parts.map((p) => p.trim()).filter(Boolean)) {
     if (chunks.length && (part.length < 12 || chunks[chunks.length - 1].length < 40)) {
       chunks[chunks.length - 1] += " " + part;
     } else {
       chunks.push(part);
+    }
+  }
+  // If the first chunk is still very long, break off a short opening clause
+  // at the first comma / semicolon / dash so playback can start sooner.
+  if (chunks.length && chunks[0].length > 90) {
+    const first = chunks[0];
+    const splitAt = first.search(/[,;:—–]\s/);
+    if (splitAt > 12 && splitAt < 70) {
+      const head = first.slice(0, splitAt + 1).trim();
+      const tail = first.slice(splitAt + 1).trim();
+      if (head && tail) chunks.splice(0, 1, head, tail);
     }
   }
   return chunks;
@@ -231,7 +244,9 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
     setStatus((s) => (s === "speaking" ? "idle" : s));
   }, []);
 
-  // Kick off the Kokoro download in the background the first time voice is on.
+  // Kick off the Kokoro download in the background as soon as voice is on —
+  // ideally while the user is still reading the greeting and typing, so the
+  // ~80 MB model is ready by the time the first assistant reply arrives.
   useEffect(() => {
     if (!enabled || kokoroRef.current || kokoroLoading.current) return;
     if (typeof window === "undefined") return;
@@ -248,15 +263,27 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
         // WASM (CPU) is slower to load but produces correct audio everywhere,
         // so we use it unconditionally rather than opportunistically trying
         // WebGPU first.
-        const tts = (await KokoroTTS.from_pretrained(TALA_KOKORO_MODEL, {
-          dtype: "q8",
-          device: "wasm",
-          progress_callback: (p: { status?: string; progress?: number }) => {
-            if (typeof p?.progress === "number") {
-              setLoadProgress(Math.round(p.progress));
-            }
-          },
-        })) as unknown as KokoroInstance;
+        //
+        // dtype: prefer q4f16 (smaller download, faster CPU inference, no
+        // audible quality loss for a concierge voice); fall back to q8 if a
+        // browser/runtime rejects the newer quantization.
+        const loadWith = (dtype: "q4f16" | "q8") =>
+          KokoroTTS.from_pretrained(TALA_KOKORO_MODEL, {
+            dtype,
+            device: "wasm",
+            progress_callback: (p: { status?: string; progress?: number }) => {
+              if (typeof p?.progress === "number") {
+                setLoadProgress(Math.round(p.progress));
+              }
+            },
+          });
+        let tts: KokoroInstance;
+        try {
+          tts = (await loadWith("q4f16")) as unknown as KokoroInstance;
+        } catch (fastErr) {
+          console.warn("[TALA] Kokoro q4f16 unavailable, falling back to q8.", fastErr);
+          tts = (await loadWith("q8")) as unknown as KokoroInstance;
+        }
         kokoroRef.current = tts;
         setEngine("kokoro");
       } catch (e) {
@@ -285,31 +312,94 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
     const generation = generationRef.current;
     setStatus("speaking");
 
-    while (queueRef.current.length && generation === generationRef.current) {
-      const chunk = queueRef.current.shift()!;
-      const kokoro = kokoroRef.current;
+    const kokoro = kokoroRef.current;
 
-      if (kokoro) {
+    if (kokoro) {
+      // Pipeline: while chunk N plays, synthesize chunk N+1 in the background.
+      // First-chunk latency is unchanged (a hard floor), but subsequent chunks
+      // start with no gap. Bounded look-ahead of 1 keeps memory in check.
+      const ready: Array<{ url: string }> = [];
+      let producerDone = false;
+      let producerError = false;
+      let notify: (() => void) | null = null;
+      const waitForReady = () =>
+        new Promise<void>((resolve) => {
+          notify = resolve;
+        });
+      const wake = () => {
+        const n = notify;
+        notify = null;
+        if (n) n();
+      };
+
+      const producer = (async () => {
         try {
-          const audio = await kokoro.generate(chunk, { voice: voiceIdRef.current });
-          if (generation !== generationRef.current) break;
-          const blob = encodePCM16Wav(audio.audio, audio.sampling_rate);
-          const url = URL.createObjectURL(blob);
-          await new Promise<void>((resolve) => {
-            const el = new Audio(url);
-            audioRef.current = el;
-            el.onended = () => resolve();
-            el.onerror = () => resolve();
-            el.play().catch(() => resolve());
-          });
-          URL.revokeObjectURL(url);
-          continue;
-        } catch (e) {
-          console.warn("[TALA] Kokoro generation failed, falling back.", e);
+          while (queueRef.current.length && generation === generationRef.current) {
+            // Cap look-ahead at 1 pre-rendered blob.
+            while (ready.length >= 1 && generation === generationRef.current) {
+              await new Promise<void>((r) => {
+                notify = r;
+              });
+            }
+            if (generation !== generationRef.current) break;
+            const chunk = queueRef.current.shift();
+            if (!chunk) break;
+            try {
+              const audio = await kokoro.generate(chunk, { voice: voiceIdRef.current });
+              if (generation !== generationRef.current) break;
+              const blob = encodePCM16Wav(audio.audio, audio.sampling_rate);
+              ready.push({ url: URL.createObjectURL(blob) });
+              wake();
+            } catch (e) {
+              console.warn("[TALA] Kokoro generation failed.", e);
+              producerError = true;
+              break;
+            }
+          }
+        } finally {
+          producerDone = true;
+          wake();
         }
+      })();
+
+      // Consumer: play blobs in order as they arrive.
+      while (generation === generationRef.current) {
+        if (!ready.length) {
+          if (producerDone) break;
+          await waitForReady();
+          continue;
+        }
+        const { url } = ready.shift()!;
+        wake(); // producer may be waiting for room
+        await new Promise<void>((resolve) => {
+          const el = new Audio(url);
+          audioRef.current = el;
+          el.onended = () => resolve();
+          el.onerror = () => resolve();
+          el.play().catch(() => resolve());
+        });
+        URL.revokeObjectURL(url);
+        if (generation !== generationRef.current) break;
       }
 
-      // Browser speech synthesis fallback.
+      // Drain any leftover blobs on cancel.
+      for (const item of ready) URL.revokeObjectURL(item.url);
+      ready.length = 0;
+      await producer.catch(() => {});
+
+      // If Kokoro blew up mid-reply, fall through to browser voice for the rest.
+      if (producerError && queueRef.current.length && generation === generationRef.current) {
+        // fall through to the browser-speech loop below
+      } else {
+        speakingRef.current = false;
+        if (generation === generationRef.current) setStatus("idle");
+        return;
+      }
+    }
+
+    // Browser speech synthesis fallback (no Kokoro, or Kokoro failed).
+    while (queueRef.current.length && generation === generationRef.current) {
+      const chunk = queueRef.current.shift()!;
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         await new Promise<void>((resolve) => {
           const utter = new SpeechSynthesisUtterance(chunk);
