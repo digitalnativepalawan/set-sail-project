@@ -16,12 +16,27 @@ Everything is free or open source:
 | Voice in | Browser Web Speech API (Chrome / Edge / Safari) | $0 |
 | Key security | Supabase Edge Function `tala-chat` proxy | $0 |
 
-## One-time setup (production)
+## Picking the model — Admin → TALA
+
+Go to `/admin/tala` in the site's admin panel. It lists **every current
+OpenRouter model, free and paid, A–Z** (pulled live from OpenRouter's public
+model catalog — no key needed just to list them). Pick one and a green
+"Synced" indicator confirms the choice reached the live site.
+
+**The API key is deliberately not on that page.** Every CMS setting —
+including this one — is stored in a `cms_data` table that's world-readable
+(the public site loads it to render itself), so a real API key typed into
+any admin field would leak to every visitor. The model *choice* is not a
+secret, so it's fine there; the *key* stays a Supabase secret (below), set
+once, separately.
+
+## One-time setup (production) — the API key
 
 TALA needs your OpenRouter API key stored as a **Supabase secret** — it never
-ships to the browser.
+ships to the browser, and it's the only step still needed to make the chat
+brain live.
 
-1. Get a key at https://openrouter.ai/keys (free models work with a $0 balance).
+1. You already have an OpenRouter key (or get one at https://openrouter.ai/keys — free models work with a $0 balance).
 2. In the Supabase dashboard for project `nfirbrpnmgsrvoomtokn`:
    **Edge Functions → Secrets → Add secret** → name `OPENROUTER_API_KEY`,
    value `sk-or-...`
@@ -31,7 +46,9 @@ ships to the browser.
    supabase functions deploy tala-chat --no-verify-jwt
    ```
 
-That's it. The widget calls `<SUPABASE_URL>/functions/v1/tala-chat`.
+That's it. The widget calls `<SUPABASE_URL>/functions/v1/tala-chat`, which
+tries the Admin-selected model first, then falls back to the free-model
+chain if that model is busy or retired.
 
 ## Building / local dev without the edge function
 

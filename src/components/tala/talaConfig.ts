@@ -39,7 +39,6 @@ export const TALA_STORAGE = {
   devApiKey: "tala.devOpenRouterKey",
   voiceEnabled: "tala.voiceEnabled",
   voiceId: "tala.voiceId",
-  model: "tala.model",
 } as const;
 
 /**

@@ -1,22 +1,57 @@
 import { useState } from "react";
 import { NavLink, Outlet, Link, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Home, Laptop, UtensilsCrossed, BedDouble, Sparkles, Tags, Images, Video,
-  Newspaper, Quote, HelpCircle, Phone, Search, Settings, FolderOpen, LogOut, Menu, X,
-  ExternalLink, Loader2, Check, MessageCircle, Palette, CalendarCheck, Ship, Users, CircleDollarSign, Bike, ClipboardList, Zap,
+  LayoutDashboard,
+  Home,
+  Laptop,
+  UtensilsCrossed,
+  BedDouble,
+  Sparkles,
+  Tags,
+  Images,
+  Video,
+  Newspaper,
+  Quote,
+  HelpCircle,
+  Phone,
+  Search,
+  Settings,
+  FolderOpen,
+  LogOut,
+  Menu,
+  X,
+  ExternalLink,
+  Loader2,
+  Check,
+  MessageCircle,
+  Palette,
+  CalendarCheck,
+  Ship,
+  Users,
+  CircleDollarSign,
+  Bike,
+  ClipboardList,
+  Zap,
+  Bot,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCms } from "@/context/CmsContext";
 import { cn } from "@/utils/cn";
 
-interface NavItem { to: string; label: string; icon: any; end?: boolean; }
-interface NavGroup { title?: string; items: NavItem[]; }
+interface NavItem {
+  to: string;
+  label: string;
+  icon: any;
+  end?: boolean;
+}
+interface NavGroup {
+  title?: string;
+  items: NavItem[];
+}
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    items: [
-      { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
-    ],
+    items: [{ to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true }],
   },
   {
     title: "Operations",
@@ -52,6 +87,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: "/admin/contact", label: "Contact", icon: Phone },
       { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
+      { to: "/admin/tala", label: "TALA (AI Concierge)", icon: Bot },
       { to: "/admin/seo", label: "SEO", icon: Search },
       { to: "/admin/appearance", label: "Appearance", icon: Palette },
       { to: "/admin/settings", label: "Settings", icon: Settings },
@@ -77,14 +113,16 @@ export default function AdminLayout() {
       {/* Mobile top bar */}
       <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-[#26221C]/10 bg-[#FAF6EF] px-4 py-3 lg:hidden">
         <span className="font-serif text-lg text-[#26221C]">Marina Admin</span>
-        <button onClick={() => setOpen(!open)}>{open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}</button>
+        <button onClick={() => setOpen(!open)}>
+          {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
       </div>
 
       {/* Sidebar */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-30 w-64 shrink-0 transform overflow-y-auto border-r border-[#26221C]/10 bg-[#1B1812] pb-8 transition-transform duration-300 lg:static lg:translate-x-0",
-          open ? "translate-x-0" : "-translate-x-full"
+          open ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="px-6 py-7">
@@ -109,7 +147,9 @@ export default function AdminLayout() {
                   className={({ isActive }) =>
                     cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                      isActive ? "bg-[#C6A15B] text-[#221D14] font-medium" : "text-white/65 hover:bg-white/5 hover:text-white"
+                      isActive
+                        ? "bg-[#C6A15B] text-[#221D14] font-medium"
+                        : "text-white/65 hover:bg-white/5 hover:text-white",
                     )
                   }
                 >
@@ -122,16 +162,25 @@ export default function AdminLayout() {
         </nav>
 
         <div className="mt-8 space-y-1 border-t border-white/10 px-3 pt-4">
-          <Link to="/" target="_blank" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white">
+          <Link
+            to="/"
+            target="_blank"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/65 hover:bg-white/5 hover:text-white"
+          >
             <ExternalLink className="h-4 w-4" /> View Live Site
           </Link>
-          <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-white/65 hover:bg-white/5 hover:text-white">
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-white/65 hover:bg-white/5 hover:text-white"
+          >
             <LogOut className="h-4 w-4" /> Log Out
           </button>
         </div>
       </aside>
 
-      {open && <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />}
+      {open && (
+        <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />
+      )}
 
       {/* Content */}
       <div className="flex-1 pt-14 lg:pt-0">
@@ -142,7 +191,8 @@ export default function AdminLayout() {
             </span>
           ) : lastSaved ? (
             <span className="flex items-center gap-1.5 text-xs text-[#26221C]/40">
-              <Check className="h-3.5 w-3.5 text-[#C6A15B]" /> Saved {lastSaved.toLocaleTimeString()}
+              <Check className="h-3.5 w-3.5 text-[#C6A15B]" /> Saved{" "}
+              {lastSaved.toLocaleTimeString()}
             </span>
           ) : null}
         </div>

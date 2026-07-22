@@ -50,7 +50,7 @@ export function TalaWidget() {
     if (!trimmed || chat.thinking) return;
     setInput("");
     voice.stop();
-    const reply = await chat.send(trimmed, systemPrompt);
+    const reply = await chat.send(trimmed, systemPrompt, data.settings.tala.modelId || undefined);
     if (reply) voice.speak(reply);
   };
 
@@ -81,6 +81,8 @@ export function TalaWidget() {
         : voice.engine === "browser"
           ? "Standard voice (natural voice downloads in background)"
           : "";
+
+  if (!data.settings.tala.enabled) return null;
 
   return (
     <>

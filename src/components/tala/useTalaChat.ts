@@ -39,10 +39,20 @@ export function setDevApiKey(key: string) {
  * Direct browser → OpenRouter call. Dev/building mode only: used when a key
  * is stored locally on this device. Production traffic should go through the
  * tala-chat edge function so the key is never exposed.
+ *
+ * @param preferredModel the model chosen in Admin → TALA, tried first before
+ *                        falling back to the free-model chain.
  */
-async function askOpenRouterDirect(messages: WireMessage[], apiKey: string): Promise<string> {
+async function askOpenRouterDirect(
+  messages: WireMessage[],
+  apiKey: string,
+  preferredModel?: string,
+): Promise<string> {
+  const chain = preferredModel
+    ? [preferredModel, ...TALA_FREE_MODELS.filter((m) => m !== preferredModel)]
+    : TALA_FREE_MODELS;
   let lastError = "";
-  for (const model of TALA_FREE_MODELS) {
+  for (const model of chain) {
     try {
       const res = await fetch(OPENROUTER_ENDPOINT, {
         method: "POST",
@@ -73,7 +83,7 @@ async function askOpenRouterDirect(messages: WireMessage[], apiKey: string): Pro
 }
 
 /** Production path: Supabase Edge Function proxy (key lives in Supabase secrets). */
-async function askEdgeFunction(messages: WireMessage[]): Promise<string> {
+async function askEdgeFunction(messages: WireMessage[], preferredModel?: string): Promise<string> {
   if (!TALA_CHAT_ENDPOINT) throw new Error("Supabase is not configured.");
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (TALA_SUPABASE_ANON_KEY) {
@@ -83,7 +93,7 @@ async function askEdgeFunction(messages: WireMessage[]): Promise<string> {
   const res = await fetch(TALA_CHAT_ENDPOINT, {
     method: "POST",
     headers,
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, model: preferredModel || undefined }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
@@ -98,7 +108,7 @@ export interface UseTalaChat {
   messages: TalaMessage[];
   thinking: boolean;
   error: string | null;
-  send: (text: string, systemPrompt: string) => Promise<string | null>;
+  send: (text: string, systemPrompt: string, preferredModel?: string) => Promise<string | null>;
   reset: () => void;
 }
 
@@ -108,44 +118,47 @@ export function useTalaChat(): UseTalaChat {
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
 
-  const send = useCallback(async (text: string, systemPrompt: string): Promise<string | null> => {
-    const trimmed = text.trim();
-    if (!trimmed || inFlight.current) return null;
-    inFlight.current = true;
-    setError(null);
-    setThinking(true);
+  const send = useCallback(
+    async (text: string, systemPrompt: string, preferredModel?: string): Promise<string | null> => {
+      const trimmed = text.trim();
+      if (!trimmed || inFlight.current) return null;
+      inFlight.current = true;
+      setError(null);
+      setThinking(true);
 
-    const userMsg: TalaMessage = { id: newId(), role: "user", content: trimmed };
-    let history: TalaMessage[] = [];
-    setMessages((prev) => {
-      history = [...prev, userMsg];
-      return history;
-    });
+      const userMsg: TalaMessage = { id: newId(), role: "user", content: trimmed };
+      let history: TalaMessage[] = [];
+      setMessages((prev) => {
+        history = [...prev, userMsg];
+        return history;
+      });
 
-    const wire: WireMessage[] = [
-      { role: "system", content: systemPrompt },
-      ...history.slice(-TALA_MAX_HISTORY).map((m) => ({ role: m.role, content: m.content })),
-    ];
+      const wire: WireMessage[] = [
+        { role: "system", content: systemPrompt },
+        ...history.slice(-TALA_MAX_HISTORY).map((m) => ({ role: m.role, content: m.content })),
+      ];
 
-    try {
-      const devKey = getDevApiKey();
-      let reply: string;
-      if (devKey) {
-        reply = await askOpenRouterDirect(wire, devKey);
-      } else {
-        reply = await askEdgeFunction(wire);
+      try {
+        const devKey = getDevApiKey();
+        let reply: string;
+        if (devKey) {
+          reply = await askOpenRouterDirect(wire, devKey, preferredModel);
+        } else {
+          reply = await askEdgeFunction(wire, preferredModel);
+        }
+        setMessages((prev) => [...prev, { id: newId(), role: "assistant", content: reply }]);
+        return reply;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Something went wrong.";
+        setError(msg);
+        return null;
+      } finally {
+        inFlight.current = false;
+        setThinking(false);
       }
-      setMessages((prev) => [...prev, { id: newId(), role: "assistant", content: reply }]);
-      return reply;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Something went wrong.";
-      setError(msg);
-      return null;
-    } finally {
-      inFlight.current = false;
-      setThinking(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const reset = useCallback(() => {
     setMessages([]);

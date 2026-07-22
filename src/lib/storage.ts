@@ -95,7 +95,7 @@ function migrateAndMerge(parsed: Partial<CmsData>): CmsData {
     const currentKeys = defaults.homepage.sectionOrder.map((s) => s.key);
     const savedOrder = parsed.homepage.sectionOrder || [];
     const missing = defaults.homepage.sectionOrder.filter(
-      (def) => !savedOrder.some((s) => s.key === def.key)
+      (def) => !savedOrder.some((s) => s.key === def.key),
     );
     merged.homepage.sectionOrder = [
       ...savedOrder.filter((s) => currentKeys.includes(s.key)),
@@ -108,9 +108,7 @@ function migrateAndMerge(parsed: Partial<CmsData>): CmsData {
   // default hero/section images without wiping their custom content.
   if (Array.isArray(merged.media)) {
     merged.media = merged.media.map((m) =>
-      !m.url && PRESEEDED_MEDIA_URLS[m.id]
-        ? { ...m, url: PRESEEDED_MEDIA_URLS[m.id] }
-        : m
+      !m.url && PRESEEDED_MEDIA_URLS[m.id] ? { ...m, url: PRESEEDED_MEDIA_URLS[m.id] } : m,
     );
   }
 
@@ -135,8 +133,13 @@ function migrateAndMerge(parsed: Partial<CmsData>): CmsData {
     merged.settings = {
       ...defaults.settings,
       ...parsed.settings,
-      contact: { ...defaults.settings.contact, ...(parsed.settings.contact || {}),
-        social: { ...defaults.settings.contact.social, ...((parsed.settings.contact as any)?.social || {}) },
+      contact: {
+        ...defaults.settings.contact,
+        ...(parsed.settings.contact || {}),
+        social: {
+          ...defaults.settings.contact.social,
+          ...((parsed.settings.contact as any)?.social || {}),
+        },
       },
       seo: { ...defaults.settings.seo, ...(parsed.settings.seo || {}) },
       whatsapp: {
@@ -144,16 +147,29 @@ function migrateAndMerge(parsed: Partial<CmsData>): CmsData {
         ...((parsed.settings as any).whatsapp || {}),
         chatbot: {
           ...defaults.settings.whatsapp.chatbot,
-          ...(((parsed.settings as any).whatsapp?.chatbot) || {}),
+          ...((parsed.settings as any).whatsapp?.chatbot || {}),
         },
       },
       theme: {
         ...defaults.settings.theme,
         ...((parsed.settings as any).theme || {}),
-        fonts: { ...defaults.settings.theme.fonts, ...(((parsed.settings as any).theme?.fonts) || {}) },
-        colors: { ...defaults.settings.theme.colors, ...(((parsed.settings as any).theme?.colors) || {}) },
-        buttons: { ...defaults.settings.theme.buttons, ...(((parsed.settings as any).theme?.buttons) || {}) },
-        ui: { ...defaults.settings.theme.ui, ...(((parsed.settings as any).theme?.ui) || {}) },
+        fonts: {
+          ...defaults.settings.theme.fonts,
+          ...((parsed.settings as any).theme?.fonts || {}),
+        },
+        colors: {
+          ...defaults.settings.theme.colors,
+          ...((parsed.settings as any).theme?.colors || {}),
+        },
+        buttons: {
+          ...defaults.settings.theme.buttons,
+          ...((parsed.settings as any).theme?.buttons || {}),
+        },
+        ui: { ...defaults.settings.theme.ui, ...((parsed.settings as any).theme?.ui || {}) },
+      },
+      tala: {
+        ...defaults.settings.tala,
+        ...((parsed.settings as any).tala || {}),
       },
     };
   }
@@ -168,13 +184,11 @@ export async function saveCms(data: CmsData): Promise<void> {
   // 2. If Supabase is connected, asynchronously upload the data payload to the cloud
   if (isSupabaseConnected() && supabase) {
     try {
-      await (supabase as any)
-        .from("cms_data")
-        .upsert({
-          key: DB_ROW_KEY,
-          value: data,
-          updated_at: new Date().toISOString(),
-        });
+      await (supabase as any).from("cms_data").upsert({
+        key: DB_ROW_KEY,
+        value: data,
+        updated_at: new Date().toISOString(),
+      });
     } catch (err) {
       console.error("Failed to sync CMS update to Supabase Cloud:", err);
     }

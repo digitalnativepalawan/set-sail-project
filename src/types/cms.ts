@@ -111,25 +111,25 @@ export interface SpeedContent {
   downloadMbps: number;
   uploadMbps: number;
   pingMs: number;
-  provider: string;         // e.g. "Starlink Business"
-  location: string;         // e.g. "Poblacion, San Vicente"
-  liveTest: boolean;        // if true, run an actual browser download test
-  lastMeasuredAt: string;   // ISO — when the owner last ran a test
+  provider: string; // e.g. "Starlink Business"
+  location: string; // e.g. "Poblacion, San Vicente"
+  liveTest: boolean; // if true, run an actual browser download test
+  lastMeasuredAt: string; // ISO — when the owner last ran a test
 
   // -------------------------------------------------------------------
   // Connection / ISP settings — these change over time (plan upgrades,
   // provider switches, added dishes, failover swaps) so every field here
   // is editable from the admin "Internet Speed" page.
   // -------------------------------------------------------------------
-  planName: string;          // e.g. "Starlink Business", "Starlink Roam"
-  dishCount: number;         // number of Starlink dishes/kits in the redundancy setup
-  hasFailover: boolean;      // show the failover badge on-site
-  failoverProvider: string;  // e.g. "Smart 5G", "Globe LTE"
-  failoverType: string;      // e.g. "5G", "4G/LTE", "Secondary Starlink"
-  redundancyNote: string;    // e.g. "Auto-switches in under 2 seconds"
-  accountReference: string;  // internal note — kit/account number, not shown publicly
-  supportContact: string;    // ISP support phone/email for the owner's reference
-  providerNotes: string;     // free-form admin notes about the current setup
+  planName: string; // e.g. "Starlink Business", "Starlink Roam"
+  dishCount: number; // number of Starlink dishes/kits in the redundancy setup
+  hasFailover: boolean; // show the failover badge on-site
+  failoverProvider: string; // e.g. "Smart 5G", "Globe LTE"
+  failoverType: string; // e.g. "5G", "4G/LTE", "Secondary Starlink"
+  redundancyNote: string; // e.g. "Auto-switches in under 2 seconds"
+  accountReference: string; // internal note — kit/account number, not shown publicly
+  supportContact: string; // ISP support phone/email for the owner's reference
+  providerNotes: string; // free-form admin notes about the current setup
 }
 
 export interface WorkspaceContent {
@@ -263,18 +263,18 @@ export interface SeoSettings {
 // ---------------------------------------------------------------------------
 export interface WhatsAppNumber {
   id: string;
-  label: string;       // e.g. "Bookings", "General", "Kitchen"
-  number: string;      // display, with country code, e.g. "+63 967 206 2327"
+  label: string; // e.g. "Bookings", "General", "Kitchen"
+  number: string; // display, with country code, e.g. "+63 967 206 2327"
   isPrimary: boolean;
 }
 
 export interface WhatsAppSettings {
   numbers: WhatsAppNumber[];
-  defaultMessage: string;         // pre-filled when a visitor opens WhatsApp
-  bookingMessage: string;         // used from pricing buttons — {package} token
-  showFloatingButton: boolean;    // toggle the site-wide floating WhatsApp
-  showInNavbar: boolean;          // toggle WhatsApp CTA in the top nav
-  businessHoursNote: string;      // e.g. "Rooftop replies 8am–8pm PHT"
+  defaultMessage: string; // pre-filled when a visitor opens WhatsApp
+  bookingMessage: string; // used from pricing buttons — {package} token
+  showFloatingButton: boolean; // toggle the site-wide floating WhatsApp
+  showInNavbar: boolean; // toggle WhatsApp CTA in the top nav
+  businessHoursNote: string; // e.g. "Rooftop replies 8am–8pm PHT"
   // Future chatbot integration (stored but not yet active)
   chatbot: {
     enabled: boolean;
@@ -292,27 +292,47 @@ export interface WhatsAppSettings {
 // ---------------------------------------------------------------------------
 export interface ThemeSettings {
   fonts: {
-    serif: string;              // heading font, e.g. "Fraunces"
-    sans: string;               // body font, e.g. "Inter"
+    serif: string; // heading font, e.g. "Fraunces"
+    sans: string; // body font, e.g. "Inter"
   };
   colors: {
-    accent: string;             // gold — buttons, icons, highlights
-    accentHover: string;        // darker gold — button hover
-    background: string;         // page cream background
-    surface: string;            // white card surface
-    text: string;               // primary charcoal text
-    darkBg: string;             // dark CTA/footer background
-    darkAlt: string;            // secondary dark surface (footer bottom)
-    darkText: string;           // light text used on dark backgrounds
+    accent: string; // gold — buttons, icons, highlights
+    accentHover: string; // darker gold — button hover
+    background: string; // page cream background
+    surface: string; // white card surface
+    text: string; // primary charcoal text
+    darkBg: string; // dark CTA/footer background
+    darkAlt: string; // secondary dark surface (footer bottom)
+    darkText: string; // light text used on dark backgrounds
   };
   buttons: {
     radius: "full" | "lg" | "md" | "sm";
-    scale: number;              // 0.85 – 1.25, multiplier for button padding
+    scale: number; // 0.85 – 1.25, multiplier for button padding
   };
   ui: {
-    animations: boolean;        // master toggle for motion animations
+    animations: boolean; // master toggle for motion animations
     sectionSpacing: "compact" | "normal" | "spacious";
   };
+}
+
+// ---------------------------------------------------------------------------
+// TALA — AI voice concierge settings. Only the MODEL CHOICE lives here
+// (public, non-secret — this whole CmsData payload is readable by anyone who
+// loads the site). The actual OpenRouter API key is never stored in the CMS;
+// it stays server-side as a Supabase Edge Function secret. This record is
+// just what the admin picked and a timestamp the widget can use to confirm
+// the choice reached the live site.
+// ---------------------------------------------------------------------------
+export interface TalaSettings {
+  enabled: boolean;
+  /** OpenRouter model id, e.g. "deepseek/deepseek-chat-v3-0324:free". Empty = use built-in free-model fallback chain. */
+  modelId: string;
+  /** Human-readable label shown in admin, captured at selection time. */
+  modelLabel: string;
+  /** Whether the selected model is one of OpenRouter's free-tier models. */
+  isFreeModel: boolean;
+  /** ISO timestamp of the last time an admin changed this — drives the "synced" indicator. */
+  updatedAt: string;
 }
 
 export interface SiteSettings {
@@ -325,6 +345,7 @@ export interface SiteSettings {
   seo: SeoSettings;
   whatsapp: WhatsAppSettings;
   theme: ThemeSettings;
+  tala: TalaSettings;
 }
 
 export interface MediaItem {
@@ -350,7 +371,15 @@ export interface MediaItem {
 export type BookingStatus = "pending" | "confirmed" | "checked_in" | "checked_out" | "cancelled";
 export type PaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 export type PaymentMethod = "cash" | "gcash" | "bank_transfer" | "card" | "paypal" | "other";
-export type BookingSource = "whatsapp" | "direct" | "airbnb" | "agoda" | "booking.com" | "walk_in" | "referral" | "other";
+export type BookingSource =
+  | "whatsapp"
+  | "direct"
+  | "airbnb"
+  | "agoda"
+  | "booking.com"
+  | "walk_in"
+  | "referral"
+  | "other";
 
 export interface Guest {
   id: string;
@@ -364,14 +393,14 @@ export interface Guest {
 
 export interface Booking {
   id: string;
-  reference: string;         // human-readable, e.g. MT-2026-001
+  reference: string; // human-readable, e.g. MT-2026-001
   guestId: string;
-  guestName: string;         // denormalized for fast display
-  roomType: string;          // "Day Pass" | "Weekly Sprint" | "Deep Work Month" | custom
-  checkIn: string;           // ISO date
-  checkOut: string;          // ISO date
+  guestName: string; // denormalized for fast display
+  roomType: string; // "Day Pass" | "Weekly Sprint" | "Deep Work Month" | custom
+  checkIn: string; // ISO date
+  checkOut: string; // ISO date
   guests: number;
-  amount: number;            // total PHP
+  amount: number; // total PHP
   paidAmount: number;
   status: BookingStatus;
   source: BookingSource;
@@ -383,10 +412,10 @@ export interface Tour {
   id: string;
   name: string;
   description: string;
-  duration: string;          // "8 hours", "half day"
-  price: number;             // per person PHP
-  capacity: number;          // max guests per departure
-  inclusions: string[];      // ["Lunch", "Snorkel gear", "Boat"]
+  duration: string; // "8 hours", "half day"
+  price: number; // per person PHP
+  capacity: number; // max guests per departure
+  inclusions: string[]; // ["Lunch", "Snorkel gear", "Boat"]
   active: boolean;
   order: number;
 }
@@ -395,10 +424,10 @@ export interface TourBooking {
   id: string;
   reference: string;
   tourId: string;
-  tourName: string;          // denormalized
+  tourName: string; // denormalized
   guestName: string;
   guestPhone: string;
-  date: string;              // ISO date of tour
+  date: string; // ISO date of tour
   guests: number;
   amount: number;
   paidAmount: number;
@@ -410,35 +439,35 @@ export interface TourBooking {
 export interface StaffMember {
   id: string;
   name: string;
-  role: string;              // "Front Desk", "Housekeeping", "Kitchen"…
+  role: string; // "Front Desk", "Housekeeping", "Kitchen"…
   phone: string;
   email: string;
   payType: "hourly" | "daily" | "monthly";
-  payRate: number;           // PHP per unit
+  payRate: number; // PHP per unit
   active: boolean;
-  hiredAt: string;           // ISO date
+  hiredAt: string; // ISO date
   notes: string;
 }
 
 export interface Shift {
   id: string;
   staffId: string;
-  date: string;              // ISO date
-  startTime: string;         // "08:00"
-  endTime: string;           // "17:00"
-  hoursWorked: number;       // computed but stored for edits
+  date: string; // ISO date
+  startTime: string; // "08:00"
+  endTime: string; // "17:00"
+  hoursWorked: number; // computed but stored for edits
   notes: string;
 }
 
 export interface PayRecord {
   id: string;
   staffId: string;
-  periodStart: string;       // ISO date
-  periodEnd: string;         // ISO date
+  periodStart: string; // ISO date
+  periodEnd: string; // ISO date
   hours: number;
-  amount: number;            // gross PHP
+  amount: number; // gross PHP
   paid: boolean;
-  paidAt: string;            // ISO or empty
+  paidAt: string; // ISO or empty
   method: PaymentMethod;
   notes: string;
 }
@@ -446,22 +475,22 @@ export interface PayRecord {
 export interface Payment {
   id: string;
   reference: string;
-  date: string;              // ISO date
+  date: string; // ISO date
   category: "booking" | "tour" | "rental" | "other" | "expense";
-  direction: "in" | "out";   // in = revenue, out = expense
+  direction: "in" | "out"; // in = revenue, out = expense
   amount: number;
   method: PaymentMethod;
-  relatedId: string;         // booking/tour/rental id, or empty
+  relatedId: string; // booking/tour/rental id, or empty
   description: string;
   notes: string;
 }
 
 export interface Motorbike {
   id: string;
-  name: string;              // "Honda Click 125 #1"
+  name: string; // "Honda Click 125 #1"
   plate: string;
   model: string;
-  dailyRate: number;         // PHP/day
+  dailyRate: number; // PHP/day
   active: boolean;
   status: "available" | "rented" | "maintenance";
   notes: string;
@@ -471,11 +500,11 @@ export interface MotorbikeRental {
   id: string;
   reference: string;
   bikeId: string;
-  bikeName: string;          // denormalized
+  bikeName: string; // denormalized
   guestName: string;
   guestPhone: string;
-  startDate: string;         // ISO
-  endDate: string;           // ISO
+  startDate: string; // ISO
+  endDate: string; // ISO
   days: number;
   amount: number;
   paidAmount: number;

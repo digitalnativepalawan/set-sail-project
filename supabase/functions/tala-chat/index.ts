@@ -54,7 +54,11 @@ Deno.serve(async (req) => {
     );
   }
 
+  // OpenRouter model ids look like "provider/model-name" or "provider/model-name:variant".
+  const MODEL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i;
+
   let messages: WireMessage[];
+  let preferredModel: string | undefined;
   try {
     const body = await req.json();
     if (!Array.isArray(body?.messages) || body.messages.length === 0) {
@@ -71,12 +75,22 @@ Deno.serve(async (req) => {
         content: m.content.slice(0, MAX_CHARS_PER_MESSAGE),
       }));
     if (!messages.length) return json({ error: "no valid messages" }, 400);
+
+    // The model admin picked in Admin → TALA (see openRouterModels.ts). Tried
+    // first, then we fall through to the free-model chain if it fails.
+    if (typeof body?.model === "string" && MODEL_ID_PATTERN.test(body.model)) {
+      preferredModel = body.model.slice(0, 200);
+    }
   } catch {
     return json({ error: "invalid JSON body" }, 400);
   }
 
+  const chain = preferredModel
+    ? [preferredModel, ...FREE_MODELS.filter((m) => m !== preferredModel)]
+    : FREE_MODELS;
+
   let lastError = "";
-  for (const model of FREE_MODELS) {
+  for (const model of chain) {
     try {
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",

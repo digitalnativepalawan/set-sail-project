@@ -15,7 +15,7 @@ export const PRESEEDED_MEDIA_URLS: Record<string, string> = {
   img_bathroom: "/images/room-uno-bed.jpg",
   img_balcony: "/images/room-due-main.jpg",
   img_community: "/images/room-tre-main.jpg",
-  img_due_minibar: "/images/room-due-minibar.jpg"
+  img_due_minibar: "/images/room-due-minibar.jpg",
 };
 
 export const PLACEHOLDER_MEDIA = [
@@ -86,19 +86,22 @@ export function buildDefaultData(): CmsData {
           id: uid("feat"),
           icon: "Wifi",
           title: "Redundant Starlink Internet",
-          description: "Primary Starlink connection with 4G/5G failover — never lose your connection mid-call.",
+          description:
+            "Primary Starlink connection with 4G/5G failover — never lose your connection mid-call.",
         },
         {
           id: uid("feat"),
           icon: "Plug",
           title: "Power at Every Seat",
-          description: "Integrated charging across the rooftop, plus backup generators for outages.",
+          description:
+            "Integrated charging across the rooftop, plus backup generators for outages.",
         },
         {
           id: uid("feat"),
           icon: "Sun",
           title: "Glare-Free Workspace",
-          description: "Canvas shading blocks harsh sun. Seats positioned for breeze and screen visibility.",
+          description:
+            "Canvas shading blocks harsh sun. Seats positioned for breeze and screen visibility.",
         },
         {
           id: uid("feat"),
@@ -113,9 +116,27 @@ export function buildDefaultData(): CmsData {
         paragraph:
           "Eating out three times a day gets old fast. Cook fresh seafood from the port, use a fully equipped shared kitchen, and never worry about cleanup — our local team handles dishes and resets so you can get back to living well.",
         features: [
-          { id: uid("kf"), icon: "Fish", title: "Cook From the Port", description: "Walk down to Poblacion port for the morning's fresh catch, then grill it upstairs before sunset." },
-          { id: uid("kf"), icon: "Soup", title: "Use the Shared Pantry", description: "Premium oils, real spices, and daily staples — no need to buy full bottles." },
-          { id: uid("kf"), icon: "Sparkles", title: "Skip the Clean-Up", description: "Cook without the sink duty. Our local team handles dishes and resets the kitchen." },
+          {
+            id: uid("kf"),
+            icon: "Fish",
+            title: "Cook From the Port",
+            description:
+              "Walk down to Poblacion port for the morning's fresh catch, then grill it upstairs before sunset.",
+          },
+          {
+            id: uid("kf"),
+            icon: "Soup",
+            title: "Use the Shared Pantry",
+            description:
+              "Premium oils, real spices, and daily staples — no need to buy full bottles.",
+          },
+          {
+            id: uid("kf"),
+            icon: "Sparkles",
+            title: "Skip the Clean-Up",
+            description:
+              "Cook without the sink duty. Our local team handles dishes and resets the kitchen.",
+          },
         ],
         imageId: "img_kitchen",
       },
@@ -125,8 +146,20 @@ export function buildDefaultData(): CmsData {
         paragraph:
           "Productive mornings. Focused afternoons. Sunset sessions that close the laptop when the light changes. Community dinners and meaningful conversations with developers, writers, founders and creators actually getting work done.",
         features: [
-          { id: uid("ff"), icon: "SunMedium", title: "Daytime Productivity", description: "Quiet mornings, focused afternoons — a community built around getting real work done." },
-          { id: uid("ff"), icon: "Sunset", title: "The 5:00 PM Reset", description: "Close the laptop when the light changes. Sunset breeze, a record on the turntable." },
+          {
+            id: uid("ff"),
+            icon: "SunMedium",
+            title: "Daytime Productivity",
+            description:
+              "Quiet mornings, focused afternoons — a community built around getting real work done.",
+          },
+          {
+            id: uid("ff"),
+            icon: "Sunset",
+            title: "The 5:00 PM Reset",
+            description:
+              "Close the laptop when the light changes. Sunset breeze, a record on the turntable.",
+          },
         ],
         imageId: "img_sunset",
       },
@@ -136,11 +169,35 @@ export function buildDefaultData(): CmsData {
         paragraph:
           "Your workspace is only as good as your recovery. Our boutique long-stay apartments feature separate living areas, ensuite bathrooms, air-conditioning and tropical modern design — optimized for long-term comfort.",
         features: [
-          { id: uid("sf"), icon: "Sofa", title: "Separate Living Areas", description: "Sofas, desks and space to think. Take private calls away from the rooftop." },
-          { id: uid("sf"), icon: "Leaf", title: "Tropical Modern Design", description: "Local wood floors, clean white finishes, large windows with natural light." },
-          { id: uid("sf"), icon: "Luggage", title: "Practical Long-Stay Comfort", description: "Ensuite bathrooms, quiet air conditioning, and storage space for longer stays." },
+          {
+            id: uid("sf"),
+            icon: "Sofa",
+            title: "Separate Living Areas",
+            description:
+              "Sofas, desks and space to think. Take private calls away from the rooftop.",
+          },
+          {
+            id: uid("sf"),
+            icon: "Leaf",
+            title: "Tropical Modern Design",
+            description:
+              "Local wood floors, clean white finishes, large windows with natural light.",
+          },
+          {
+            id: uid("sf"),
+            icon: "Luggage",
+            title: "Practical Long-Stay Comfort",
+            description:
+              "Ensuite bathrooms, quiet air conditioning, and storage space for longer stays.",
+          },
         ],
-        galleryImageIds: ["img_bedroom", "img_living", "img_bathroom", "img_balcony", "img_community"],
+        galleryImageIds: [
+          "img_bedroom",
+          "img_living",
+          "img_bathroom",
+          "img_balcony",
+          "img_community",
+        ],
       },
       speed: {
         eyebrow: "Real Performance",
@@ -171,11 +228,12 @@ export function buildDefaultData(): CmsData {
           capacity: "2 Adults",
           size: "24sqm",
           view: "City",
-          description: "The largest room, with sofa and coffee table, large screen TV, air conditioning, large bright windows, and an elegant and welcoming style.",
+          description:
+            "The largest room, with sofa and coffee table, large screen TV, air conditioning, large bright windows, and an elegant and welcoming style.",
           price: "$42",
           imageKey: "/images/room-uno-main.jpg",
           visible: true,
-          order: 0
+          order: 0,
         },
         {
           id: uid("rm"),
@@ -183,11 +241,12 @@ export function buildDefaultData(): CmsData {
           capacity: "2 Adults",
           size: "20sqm",
           view: "Ocean",
-          description: "Double bedroom with king size bed, TV, air conditioning, large bright windows, and an elegant and welcoming style. Private bathroom. Non-smoking room. Immediate confirmation.",
+          description:
+            "Double bedroom with king size bed, TV, air conditioning, large bright windows, and an elegant and welcoming style. Private bathroom. Non-smoking room. Immediate confirmation.",
           price: "$32",
           imageKey: "/images/room-due-main.jpg",
           visible: true,
-          order: 1
+          order: 1,
         },
         {
           id: uid("rm"),
@@ -195,11 +254,12 @@ export function buildDefaultData(): CmsData {
           capacity: "2 Adults",
           size: "15sqm",
           view: "No View",
-          description: "Compact and budget-friendly room featuring sturdy wooden bunk beds, perfect for close friends.",
+          description:
+            "Compact and budget-friendly room featuring sturdy wooden bunk beds, perfect for close friends.",
           price: "$24",
           imageKey: "/images/room-tre-main.jpg",
           visible: true,
-          order: 2
+          order: 2,
         },
         {
           id: uid("rm"),
@@ -207,12 +267,13 @@ export function buildDefaultData(): CmsData {
           capacity: "2 Adults",
           size: "10sqm",
           view: "Skyline",
-          description: "Minimalist and perfectly quiet corner single room designed specifically for deep focus and solo travelers.",
+          description:
+            "Minimalist and perfectly quiet corner single room designed specifically for deep focus and solo travelers.",
           price: "$20",
           imageKey: "/images/room-quattro-main.jpg",
           visible: true,
-          order: 3
-        }
+          order: 3,
+        },
       ],
       facilities: {
         eyebrow: "In Every Suite",
@@ -220,18 +281,31 @@ export function buildDefaultData(): CmsData {
         paragraph:
           "Every long-stay suite comes fully equipped for comfortable living and productive remote work. Nothing to think about, nothing to buy.",
         items: [
-          { id: uid("fac"), icon: "Wifi", name: "High-speed in-room WiFi", order: 0, visible: true },
+          {
+            id: uid("fac"),
+            icon: "Wifi",
+            name: "High-speed in-room WiFi",
+            order: 0,
+            visible: true,
+          },
           { id: uid("fac"), icon: "Wine", name: "Mini bar", order: 1, visible: true },
           { id: uid("fac"), icon: "Coffee", name: "Kettle", order: 2, visible: true },
           { id: uid("fac"), icon: "Snowflake", name: "Air conditioning", order: 3, visible: true },
           { id: uid("fac"), icon: "Tv", name: "TV", order: 4, visible: true },
           { id: uid("fac"), icon: "ShowerHead", name: "Hot shower", order: 5, visible: true },
           { id: uid("fac"), icon: "Bath", name: "Private bathroom", order: 6, visible: true },
-          { id: uid("fac"), icon: "BedDouble", name: "Bed linen, towels & desk", order: 7, visible: true },
+          {
+            id: uid("fac"),
+            icon: "BedDouble",
+            name: "Bed linen, towels & desk",
+            order: 7,
+            visible: true,
+          },
         ],
       },
       ctaTitle: "Ready to Change Your View?",
-      ctaSubtext: "Spaces are limited to protect the quiet, high-bandwidth environment for every working resident.",
+      ctaSubtext:
+        "Spaces are limited to protect the quiet, high-bandwidth environment for every working resident.",
       ctaButtonLabel: "Apply for an Extended Stay / Book Now",
     },
     workspace: {
@@ -241,9 +315,24 @@ export function buildDefaultData(): CmsData {
         "Panoramic ocean views, shaded seating, and an atmosphere engineered for concentration. Marina Terrace's rooftop workspace was designed from the ground up for people who take their craft seriously.",
       imageId: "img_workspace",
       highlights: [
-        { id: uid("wh"), icon: "Waves", title: "Ocean View", description: "Every seat faces the water. Watch bancas drift by while you work." },
-        { id: uid("wh"), icon: "Wifi", title: "Starlink + Failover", description: "Redundant connectivity engineered for video calls and large uploads." },
-        { id: uid("wh"), icon: "Clock", title: "Open Early, Open Late", description: "Rooftop access from sunrise sessions to late-night sprints." },
+        {
+          id: uid("wh"),
+          icon: "Waves",
+          title: "Ocean View",
+          description: "Every seat faces the water. Watch bancas drift by while you work.",
+        },
+        {
+          id: uid("wh"),
+          icon: "Wifi",
+          title: "Starlink + Failover",
+          description: "Redundant connectivity engineered for video calls and large uploads.",
+        },
+        {
+          id: uid("wh"),
+          icon: "Clock",
+          title: "Open Early, Open Late",
+          description: "Rooftop access from sunrise sessions to late-night sprints.",
+        },
       ],
     },
     pricing: [
@@ -253,7 +342,8 @@ export function buildDefaultData(): CmsData {
         price: "₱1,040",
         period: "/day",
         icon: "User",
-        description: "For visitors & locals who need high-speed Wi-Fi and rooftop desk access for the day.",
+        description:
+          "For visitors & locals who need high-speed Wi-Fi and rooftop desk access for the day.",
         features: [
           { id: uid("pf"), text: "High-speed Wi-Fi" },
           { id: uid("pf"), text: "Rooftop desk access" },
@@ -269,7 +359,8 @@ export function buildDefaultData(): CmsData {
         price: "₱15,470",
         period: "/week",
         icon: "CalendarDays",
-        description: "For short-term builders. 7 nights in a private suite with unrestricted rooftop access.",
+        description:
+          "For short-term builders. 7 nights in a private suite with unrestricted rooftop access.",
         features: [
           { id: uid("pf"), text: "7 nights in a private suite" },
           { id: uid("pf"), text: "24/7 rooftop workspace access" },
@@ -285,7 +376,8 @@ export function buildDefaultData(): CmsData {
         price: "₱44,200",
         period: "/month",
         icon: "Laptop",
-        description: "For long-term digital nomads. A discounted 30-night stay with priority desk zone.",
+        description:
+          "For long-term digital nomads. A discounted 30-night stay with priority desk zone.",
         features: [
           { id: uid("pf"), text: "30-night discounted stay" },
           { id: uid("pf"), text: "Priority desk zone" },
@@ -337,7 +429,8 @@ export function buildDefaultData(): CmsData {
         status: "published",
         publishAt: new Date().toISOString(),
         seoTitle: "The Digital Nomad's Guide to San Vicente, Palawan",
-        seoDescription: "Everything you need to know before landing in San Vicente, Palawan as a remote worker.",
+        seoDescription:
+          "Everything you need to know before landing in San Vicente, Palawan as a remote worker.",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -355,7 +448,8 @@ export function buildDefaultData(): CmsData {
         status: "published",
         publishAt: new Date().toISOString(),
         seoTitle: "5 Ways We Designed Marina Terrace for Deep Work",
-        seoDescription: "A behind-the-scenes look at the decisions behind our rooftop coworking space.",
+        seoDescription:
+          "A behind-the-scenes look at the decisions behind our rooftop coworking space.",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -367,7 +461,8 @@ export function buildDefaultData(): CmsData {
         country: "Germany",
         occupation: "Product Designer",
         rating: 5,
-        quote: "The most productive month of my career happened on this rooftop. The internet never dropped once — even during a client demo.",
+        quote:
+          "The most productive month of my career happened on this rooftop. The internet never dropped once — even during a client demo.",
         imageId: "img_testimonial_1",
         order: 0,
       },
@@ -377,7 +472,8 @@ export function buildDefaultData(): CmsData {
         country: "Canada",
         occupation: "Founder, SaaS Startup",
         rating: 5,
-        quote: "I extended my stay twice. Between sunrise work sessions and sunset dinners with other founders, it's hard to leave.",
+        quote:
+          "I extended my stay twice. Between sunrise work sessions and sunset dinners with other founders, it's hard to leave.",
         imageId: "img_testimonial_2",
         order: 1,
       },
@@ -387,17 +483,48 @@ export function buildDefaultData(): CmsData {
         country: "Vietnam",
         occupation: "Freelance Writer",
         rating: 5,
-        quote: "Quiet when I needed to write, social when I needed a break. The kitchen alone is worth the trip.",
+        quote:
+          "Quiet when I needed to write, social when I needed a break. The kitchen alone is worth the trip.",
         imageId: "img_testimonial_3",
         order: 2,
       },
     ],
     faqs: [
-      { id: uid("faq"), question: "How fast is the internet, really?", answer: "We run a primary Starlink connection with automatic 4G/5G failover, plus wired backup at every desk. Speeds average 80–150 Mbps.", order: 0 },
-      { id: uid("faq"), question: "Do you offer discounts for longer stays?", answer: "Yes — the Deep Work Month package offers the best nightly rate, and we can tailor multi-month stays on request via WhatsApp.", order: 1 },
-      { id: uid("faq"), question: "Is the rooftop open to non-guests?", answer: "Yes, our Day Pass is available to visitors and locals who want rooftop desk access and kitchen utilities for the day.", order: 2 },
-      { id: uid("faq"), question: "What's included in the guest kitchen?", answer: "A fully equipped shared kitchen with a premium pantry, cookware, and daily cleanup handled by our local team.", order: 3 },
-      { id: uid("faq"), question: "How do I get to San Vicente?", answer: "Fly into Puerto Princesa, then it's roughly a 3.5 hour van ride along a newly paved highway to Poblacion, San Vicente.", order: 4 },
+      {
+        id: uid("faq"),
+        question: "How fast is the internet, really?",
+        answer:
+          "We run a primary Starlink connection with automatic 4G/5G failover, plus wired backup at every desk. Speeds average 80–150 Mbps.",
+        order: 0,
+      },
+      {
+        id: uid("faq"),
+        question: "Do you offer discounts for longer stays?",
+        answer:
+          "Yes — the Deep Work Month package offers the best nightly rate, and we can tailor multi-month stays on request via WhatsApp.",
+        order: 1,
+      },
+      {
+        id: uid("faq"),
+        question: "Is the rooftop open to non-guests?",
+        answer:
+          "Yes, our Day Pass is available to visitors and locals who want rooftop desk access and kitchen utilities for the day.",
+        order: 2,
+      },
+      {
+        id: uid("faq"),
+        question: "What's included in the guest kitchen?",
+        answer:
+          "A fully equipped shared kitchen with a premium pantry, cookware, and daily cleanup handled by our local team.",
+        order: 3,
+      },
+      {
+        id: uid("faq"),
+        question: "How do I get to San Vicente?",
+        answer:
+          "Fly into Puerto Princesa, then it's roughly a 3.5 hour van ride along a newly paved highway to Poblacion, San Vicente.",
+        order: 4,
+      },
     ],
     settings: {
       siteName: "Marina Terrace",
@@ -424,7 +551,8 @@ export function buildDefaultData(): CmsData {
         homeTitle: "Marina Terrace | Your Ocean-View Office in Palawan",
         homeDescription:
           "A rooftop coworking space and boutique long-stay destination for digital nomads in San Vicente, Palawan. Starlink internet, guest kitchen, and long-stay suites.",
-        keywords: "coworking palawan, digital nomad philippines, san vicente palawan, remote work palawan, long stay palawan",
+        keywords:
+          "coworking palawan, digital nomad philippines, san vicente palawan, remote work palawan, long stay palawan",
         ogImageId: "img_og",
       },
       theme: {
@@ -453,10 +581,16 @@ export function buildDefaultData(): CmsData {
       },
       whatsapp: {
         numbers: [
-          { id: uid("wa"), label: "Bookings & General", number: "+63 967 206 2327", isPrimary: true },
+          {
+            id: uid("wa"),
+            label: "Bookings & General",
+            number: "+63 967 206 2327",
+            isPrimary: true,
+          },
         ],
         defaultMessage: "Hi Marina Terrace! I'd like to know more about staying with you.",
-        bookingMessage: "Hi! I'd like to book the {package} package. Could you confirm availability?",
+        bookingMessage:
+          "Hi! I'd like to book the {package} package. Could you confirm availability?",
         showFloatingButton: true,
         showInNavbar: true,
         businessHoursNote: "We reply within a few hours during 8:00 AM – 8:00 PM PHT.",
@@ -467,6 +601,13 @@ export function buildDefaultData(): CmsData {
           webhookUrl: "",
           autoReplyMessage: "Salamat! A member of our team will get back to you shortly.",
         },
+      },
+      tala: {
+        enabled: true,
+        modelId: "",
+        modelLabel: "",
+        isFreeModel: true,
+        updatedAt: "",
       },
     },
     media: buildDefaultMedia(),
@@ -526,16 +667,67 @@ export function buildDefaultOperations(): import("@/types/cms").Operations {
     ],
     tourBookings: [],
     staff: [
-      { id: uid("staff"), name: "Maria Santos", role: "Front Desk", phone: "+63 917 000 0001", email: "", payType: "daily", payRate: 800, active: true, hiredAt: iso(addDays(today, -60)), notes: "" },
-      { id: uid("staff"), name: "Junnel Reyes", role: "Kitchen", phone: "+63 917 000 0002", email: "", payType: "daily", payRate: 700, active: true, hiredAt: iso(addDays(today, -90)), notes: "" },
-      { id: uid("staff"), name: "Ana Cruz", role: "Housekeeping", phone: "+63 917 000 0003", email: "", payType: "daily", payRate: 650, active: true, hiredAt: iso(addDays(today, -30)), notes: "" },
+      {
+        id: uid("staff"),
+        name: "Maria Santos",
+        role: "Front Desk",
+        phone: "+63 917 000 0001",
+        email: "",
+        payType: "daily",
+        payRate: 800,
+        active: true,
+        hiredAt: iso(addDays(today, -60)),
+        notes: "",
+      },
+      {
+        id: uid("staff"),
+        name: "Junnel Reyes",
+        role: "Kitchen",
+        phone: "+63 917 000 0002",
+        email: "",
+        payType: "daily",
+        payRate: 700,
+        active: true,
+        hiredAt: iso(addDays(today, -90)),
+        notes: "",
+      },
+      {
+        id: uid("staff"),
+        name: "Ana Cruz",
+        role: "Housekeeping",
+        phone: "+63 917 000 0003",
+        email: "",
+        payType: "daily",
+        payRate: 650,
+        active: true,
+        hiredAt: iso(addDays(today, -30)),
+        notes: "",
+      },
     ],
     shifts: [],
     payRecords: [],
     payments: [],
     motorbikes: [
-      { id: uid("bike"), name: "Honda Click 125 #1", plate: "ABC-1234", model: "Honda Click 125i", dailyRate: 500, active: true, status: "available", notes: "" },
-      { id: uid("bike"), name: "Yamaha Mio #1", plate: "DEF-5678", model: "Yamaha Mio Sporty", dailyRate: 450, active: true, status: "available", notes: "" },
+      {
+        id: uid("bike"),
+        name: "Honda Click 125 #1",
+        plate: "ABC-1234",
+        model: "Honda Click 125i",
+        dailyRate: 500,
+        active: true,
+        status: "available",
+        notes: "",
+      },
+      {
+        id: uid("bike"),
+        name: "Yamaha Mio #1",
+        plate: "DEF-5678",
+        model: "Yamaha Mio Sporty",
+        dailyRate: 450,
+        active: true,
+        status: "available",
+        notes: "",
+      },
     ],
     motorbikeRentals: [],
   };
