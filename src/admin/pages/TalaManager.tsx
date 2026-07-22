@@ -108,30 +108,42 @@ export default function TalaManager() {
     };
     patchTala(() => nextTala);
     notify(`TALA model set to ${model.name}`);
+    await confirmSynced((cloudTala) => cloudTala?.modelId === nextTala.modelId);
+  };
 
-    // Confirm the choice actually round-tripped to Supabase (the "green light").
+  // Confirm a change actually round-tripped to Supabase (the "green light").
+  // CmsContext debounces its save by 400ms, then the upsert itself is a
+  // network round trip — a single check shortly after often fires before the
+  // write has landed, showing a false "couldn't confirm" error. Poll a few
+  // times instead of checking once.
+  const confirmSynced = async (matches: (cloudTala: TalaSettings | undefined) => boolean) => {
     setSync("saving");
-    await new Promise((r) => setTimeout(r, 500)); // let CmsContext's debounced save fire
+    await new Promise((r) => setTimeout(r, 500));
     setSync("verifying");
-    try {
-      if (isSupabaseConnected() && supabase) {
+
+    if (!isSupabaseConnected() || !supabase) {
+      setSync("synced"); // localStorage-only mode: save() completing is the whole story
+      return;
+    }
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
         const { data: row, error } = await supabase
           .from("cms_data")
           .select("value")
           .eq("key", DB_ROW_KEY)
           .maybeSingle();
-        const cloudModelId = (row?.value as Partial<CmsData> | undefined)?.settings?.tala?.modelId;
-        if (!error && cloudModelId === nextTala.modelId) {
+        const cloudTala = (row?.value as Partial<CmsData> | undefined)?.settings?.tala;
+        if (!error && matches(cloudTala)) {
           setSync("synced");
-        } else {
-          setSync("error");
+          return;
         }
-      } else {
-        setSync("synced"); // localStorage-only mode: save() completing is the whole story
+      } catch {
+        // fall through to retry
       }
-    } catch {
-      setSync("error");
+      await new Promise((r) => setTimeout(r, 600));
     }
+    setSync("error");
   };
 
   const toggleEnabled = (on: boolean) => {
@@ -139,10 +151,11 @@ export default function TalaManager() {
     notify(on ? "TALA enabled on the site" : "TALA hidden from the site");
   };
 
-  const saveKey = () => {
+  const saveKey = async () => {
     const trimmed = keyInput.trim();
     patchTala((t) => ({ ...t, apiKey: trimmed, updatedAt: new Date().toISOString() }));
     notify(trimmed ? "API key saved — TALA is live" : "API key cleared");
+    await confirmSynced((cloudTala) => cloudTala?.apiKey === trimmed);
   };
 
   // ---- Live test — runs the exact same pipeline a visitor's browser would,

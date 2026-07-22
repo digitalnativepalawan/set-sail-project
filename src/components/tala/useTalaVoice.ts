@@ -188,10 +188,15 @@ export function useTalaVoice(): UseTalaVoice {
     (async () => {
       try {
         const { KokoroTTS } = await import("kokoro-js");
-        const hasWebGPU = "gpu" in navigator;
+        // WebGPU inference has real, reported bugs on some Windows GPU/driver
+        // combinations that corrupt the generated audio into static/noise —
+        // the model runs without error, but the output samples are garbage.
+        // WASM (CPU) is slower to load but produces correct audio everywhere,
+        // so we use it unconditionally rather than opportunistically trying
+        // WebGPU first.
         const tts = (await KokoroTTS.from_pretrained(TALA_KOKORO_MODEL, {
-          dtype: hasWebGPU ? "fp32" : "q8",
-          device: hasWebGPU ? "webgpu" : "wasm",
+          dtype: "q8",
+          device: "wasm",
           progress_callback: (p: { status?: string; progress?: number }) => {
             if (typeof p?.progress === "number") {
               setLoadProgress(Math.round(p.progress));
