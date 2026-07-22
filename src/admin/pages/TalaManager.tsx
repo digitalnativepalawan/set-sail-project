@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -10,6 +10,7 @@ import {
   PlayCircle,
   RefreshCw,
   Sparkles,
+  UserCheck,
   Volume2,
 } from "lucide-react";
 import { useCms } from "@/context/CmsContext";
@@ -44,6 +45,14 @@ import { TALA_KOKORO_VOICES } from "@/components/tala/talaConfig";
 
 type SyncState = "idle" | "saving" | "verifying" | "synced" | "error";
 
+interface TalaLead {
+  id: string;
+  name: string;
+  contact: string;
+  note: string;
+  created_at: string;
+}
+
 const DB_ROW_KEY = "marina_terrace_payload";
 
 export default function TalaManager() {
@@ -59,6 +68,37 @@ export default function TalaManager() {
   const [sync, setSync] = useState<SyncState>("idle");
   const [keyInput, setKeyInput] = useState(tala.apiKey);
   const [showKey, setShowKey] = useState(false);
+
+  // ---- Leads TALA has captured via the log_interested_guest tool.
+  const [leads, setLeads] = useState<TalaLead[] | null>(null);
+  const [leadsError, setLeadsError] = useState<string | null>(null);
+  const [loadingLeads, setLoadingLeads] = useState(true);
+
+  const loadLeads = useCallback(async () => {
+    setLoadingLeads(true);
+    setLeadsError(null);
+    try {
+      if (!isSupabaseConnected() || !supabase) {
+        setLeads([]);
+        return;
+      }
+      const { data: rows, error } = await supabase
+        .from("tala_leads")
+        .select("id, name, contact, note, created_at")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      setLeads((rows as TalaLead[]) ?? []);
+    } catch (e) {
+      setLeadsError(e instanceof Error ? e.message : "Couldn't load leads.");
+    } finally {
+      setLoadingLeads(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLeads();
+  }, [loadLeads]);
 
   const loadModels = async () => {
     setLoadingModels(true);
@@ -182,8 +222,10 @@ export default function TalaManager() {
     const reply = await chat.send(testMessage, systemPrompt, {
       model: tala.modelId || undefined,
       adminApiKey: tala.apiKey || undefined,
+      cms: data,
     });
     if (reply) voice.speak(reply);
+    void loadLeads(); // pick up a new lead if the test triggered log_interested_guest
   };
 
   const chooseVoice = async (voiceId: string) => {
@@ -540,6 +582,67 @@ export default function TalaManager() {
           <p className="mt-3 flex items-center gap-2 text-xs text-[#26221C]/50">
             <Volume2 className="h-3.5 w-3.5 animate-pulse text-[#C6A15B]" /> Speaking…
           </p>
+        )}
+      </Card>
+
+      <Card className="mb-6 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="font-serif text-lg text-[#26221C]">Leads TALA has captured</p>
+            <p className="mt-1 text-sm text-[#26221C]/55">
+              TALA can save a guest's interest with her log_interested_guest tool when they share a
+              name or contact but the chat ends before they reach WhatsApp. Proof it's a real
+              action, not just talk — this list is live.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void loadLeads()}
+            disabled={loadingLeads}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loadingLeads ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
+
+        {leadsError && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{leadsError}</p>
+          </div>
+        )}
+
+        {!leadsError && leads && leads.length === 0 && (
+          <p className="rounded-xl border border-dashed border-[#26221C]/15 bg-white/50 p-6 text-center text-sm text-[#26221C]/50">
+            No leads yet. Run a test above where you mention your name and a way to reach you.
+          </p>
+        )}
+
+        {leads && leads.length > 0 && (
+          <div className="space-y-2">
+            {leads.map((lead) => (
+              <div
+                key={lead.id}
+                className="flex items-start gap-3 rounded-xl border border-[#26221C]/10 bg-[#FAF6EF] p-3"
+              >
+                <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#C6A15B]" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-sm font-medium text-[#26221C]">
+                      {lead.name || "(no name given)"}
+                    </span>
+                    {lead.contact && (
+                      <span className="text-xs text-[#26221C]/50">{lead.contact}</span>
+                    )}
+                    <span className="text-xs text-[#26221C]/40">
+                      {new Date(lead.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  {lead.note && <p className="mt-1 text-sm text-[#26221C]/70">{lead.note}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </Card>
 
