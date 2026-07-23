@@ -204,6 +204,10 @@ export interface UseTalaVoice {
   setVoiceId: (id: string) => void;
   speak: (text: string) => void;
   stop: () => void;
+  /** Audition a specific Kokoro voice id (does not change the saved selection). */
+  preview: (id: string, text?: string) => void;
+  /** The voice id currently auditioning, or null. */
+  previewId: string | null;
 }
 
 export interface UseTalaVoiceOptions {
@@ -511,6 +515,56 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
   // download finishes; it runs before playQueue exists, so it goes via a ref.
   playQueueRef.current = playQueue;
 
+  // Audition a specific Kokoro voice without changing the saved selection.
+  // Used by the admin "female voice picker" so David can hear each option
+  // before picking. Loads the model on demand (same cached 80 MB), speaks a
+  // short sample as that voice, and reports playing state via previewState.
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const preview = useCallback(
+    async (id: string, text: string) => {
+      if (providerRef.current === "openrouter") {
+        // OpenRouter provider has no per-voice sample here; just speak as-is.
+        speak(text);
+        return;
+      }
+      if (!kokoroRef.current) {
+        // Kick the loader if it hasn't started (e.g. voice disabled in admin).
+        setEnabled(true);
+      }
+      setPreviewId(id);
+      const sample = text || "Hi, I'm TALA — your friend in San Vicente. Lovely to meet you!";
+      // Wait briefly for the model if still loading, then play one sample blob.
+      let tries = 0;
+      while (!kokoroRef.current && tries < 60) {
+        await new Promise((r) => setTimeout(r, 500));
+        tries++;
+      }
+      const kokoro = kokoroRef.current;
+      if (!kokoro) {
+        setPreviewId(null);
+        return; // model unavailable; nothing to audition
+      }
+      try {
+        const audio = await kokoro.generate(sample, { voice: id });
+        const blob = encodePCM16Wav(audio.audio, audio.sampling_rate);
+        const url = URL.createObjectURL(blob);
+        await new Promise<void>((resolve) => {
+          const el = new Audio(url);
+          audioRef.current = el;
+          el.onended = () => resolve();
+          el.onerror = () => resolve();
+          el.play().catch(() => resolve());
+        });
+        URL.revokeObjectURL(url);
+      } catch {
+        /* audition failed silently */
+      } finally {
+        setPreviewId(null);
+      }
+    },
+    [speak, setEnabled],
+  );
+
   const speak = useCallback(
     (text: string) => {
       if (!enabled) return;
@@ -559,5 +613,7 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
     setVoiceId,
     speak,
     stop,
+    preview,
+    previewId,
   };
 }
