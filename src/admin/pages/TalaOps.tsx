@@ -73,7 +73,7 @@ export default function TalaOps() {
       {tab === "goals" && <GoalsTab notify={notify} />}
       {tab === "tasks" && <TasksTab notify={notify} />}
       {tab === "wins" && <WinsTab cms={data} notify={notify} />}
-      {tab === "leads" && <LeadsTab cms={data} notify={notify} />}
+      {tab === "leads" && <LeadsTab cms={data} />}
     </div>
   );
 }
