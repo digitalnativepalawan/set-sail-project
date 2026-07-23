@@ -363,7 +363,47 @@ async function logInterestedGuest(args: Record<string, unknown>) {
   }
 }
 
-// ---- OWNER WRITE TOOLS ----------------------------------------------------
+// ---- AUTO LEAD CAPTURE (guest mode) --------------------------------------
+// After ANY guest message, if they shared a contact (email/phone/whatsapp)
+// or a name, save a tala_leads row so the team can follow up — even if the
+// conversation never reaches a booking or the WhatsApp fallback. Best-effort
+// and deduped per session; failures are swallowed (never break the chat).
+const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
+const PHONE_RE = /(?:\+?\d[\d\s()-]{7,}\d)/;
+const NAME_HINT_RE = /\b(i am|i'm|my name is|this is|it's|name's)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/;
+
+export async function captureGuestLead(
+  text: string,
+  sessionKey: string,
+): Promise<void> {
+  try {
+    if (!isSupabaseConnected() || !supabase) return;
+    const email = text.match(EMAIL_RE)?.[0];
+    const phoneRaw = text.match(PHONE_RE)?.[0];
+    const phone = phoneRaw?.replace(/[\s()-]/g, "");
+    const nameMatch = text.match(NAME_HINT_RE);
+    const name = nameMatch?.[2];
+    if (!email && !phone && !name) return; // nothing worth saving yet
+
+    // Dedup: only capture once per session + contact key.
+    const dedupKey = `${sessionKey}:${email || phone || name || ""}`.toLowerCase();
+    if ((captureGuestLead as unknown as { _seen?: Set<string> })._seen?.has(dedupKey)) return;
+    (((captureGuestLead as unknown as { _seen?: Set<string> })._seen ??= new Set<string>()) as Set<string>).add(dedupKey);
+
+    const parts: string[] = [];
+    if (email) parts.push(`email ${email}`);
+    if (phone) parts.push(`phone ${phone}`);
+    await supabase.from("tala_leads").insert({
+      name: name ?? "",
+      contact: (email || phone || "").slice(0, 200),
+      note: (parts.join("; ") || "guest shared contact in chat").slice(0, 1000),
+      source: "tala_chat_auto",
+    });
+  } catch {
+    // lead capture must never break the conversation
+  }
+}
+
 
 function findBooking(
   cms: CmsData,

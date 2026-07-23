@@ -11,6 +11,7 @@ import {
 import {
   TALA_TOOL_SCHEMAS,
   executeTalaTool,
+  captureGuestLead,
   confirmBookingDraft,
   type TalaToolContext,
 } from "./talaTools";
@@ -278,6 +279,12 @@ export function useTalaChat(): UseTalaChat {
       const history: TalaMessage[] = [...messagesRef.current, userMsg];
       messagesRef.current = history;
       setMessages(history);
+
+      // Auto-capture a lead whenever a guest shares a contact/name — even if
+      // the chat never reaches a booking. Skipped for the operator face.
+      if (!options?.owner) {
+        void captureGuestLead(trimmed, options?.cms?.settings?.siteName || "guest");
+      }
 
       let wire: WireMessage[] = [
         { role: "system", content: systemPrompt },

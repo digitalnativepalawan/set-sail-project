@@ -446,6 +446,28 @@ export async function handleRequest(req: Request): Promise<Response> {
     } catch {
       // audit must never break the conversation
     }
+    // Auto lead capture: if the guest shared a contact or name, save it even
+    // when the conversation ends before a booking/WhatsApp handoff.
+    try {
+      const text = String(lastHuman?.content ?? "");
+      const email = text.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)?.[0];
+      const phoneRaw = text.match(/(?:\+?\d[\d\s()-]{7,}\d)/)?.[0];
+      const phone = phoneRaw?.replace(/[\s()-]/g, "");
+      const name = text.match(/\b(i am|i'm|my name is|this is|it's|name's)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/)?.[2];
+      if (email || phone || name) {
+        const parts: string[] = [];
+        if (email) parts.push(`email ${email}`);
+        if (phone) parts.push(`phone ${phone}`);
+        await supabase.from("tala_leads").insert({
+          name: name ?? "",
+          contact: (email || phone || "").slice(0, 200),
+          note: (parts.join("; ") || "guest shared contact in chat").slice(0, 1000),
+          source: "tala_chat_auto",
+        });
+      }
+    } catch {
+      // lead capture must never break the conversation
+    }
     return {};
   }
 
