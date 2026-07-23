@@ -115,7 +115,7 @@ BEGIN
     PERFORM cron.schedule(
       'tala_daily_briefing',
       '0 23 * * *',                      -- 23:00 UTC = 07:00 GMT+8
-      $$ SELECT public.generate_tala_briefing(); $$
+      $cmd$ SELECT public.generate_tala_briefing(); $cmd$
     );
   END IF;
 END $$;
