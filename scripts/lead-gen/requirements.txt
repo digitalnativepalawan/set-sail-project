@@ -1,0 +1,3 @@
+scrapling[all]
+supabase
+python-dotenv
