@@ -65,6 +65,60 @@ export type Database = {
         }
         Relationships: []
       }
+      tala_briefings: {
+        Row: {
+          brief_date: string
+          generated_at: string
+          highlights: Json
+          id: string
+          summary: string
+          whatsapp_sent: boolean
+        }
+        Insert: {
+          brief_date?: string
+          generated_at?: string
+          highlights?: Json
+          id?: string
+          summary?: string
+          whatsapp_sent?: boolean
+        }
+        Update: {
+          brief_date?: string
+          generated_at?: string
+          highlights?: Json
+          id?: string
+          summary?: string
+          whatsapp_sent?: boolean
+        }
+        Relationships: []
+      }
+      tala_goals: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          status: string
+          target_date: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          status?: string
+          target_date?: string
+          title?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          status?: string
+          target_date?: string
+          title?: string
+        }
+        Relationships: []
+      }
       tala_knowledge: {
         Row: {
           body: string
@@ -128,12 +182,76 @@ export type Database = {
         }
         Relationships: []
       }
+      tala_tasks: {
+        Row: {
+          category: string
+          created_at: string
+          due: string
+          id: string
+          status: string
+          title: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          due?: string
+          id?: string
+          status?: string
+          title?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          due?: string
+          id?: string
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      tala_wins: {
+        Row: {
+          brief_date: string
+          created_at: string
+          id: string
+          text: string
+        }
+        Insert: {
+          brief_date?: string
+          created_at?: string
+          id?: string
+          text?: string
+        }
+        Update: {
+          brief_date?: string
+          created_at?: string
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_tala_briefing: {
+        Args: never
+        Returns: {
+          brief_date: string
+          generated_at: string
+          highlights: Json
+          id: string
+          summary: string
+          whatsapp_sent: boolean
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tala_briefings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       [_ in never]: never

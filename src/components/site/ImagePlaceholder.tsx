@@ -25,6 +25,13 @@ export function ImagePlaceholder({ mediaId, label, className, rounded = "rounded
   const media = mediaId ? data.media.find((m) => m.id === mediaId) : undefined;
   const resolvedLabel = label || media?.label || "Image";
 
+  // Fallback: treat mediaId as a direct URL when no Media Library entry
+  // matches (e.g. legacy defaults or user-pasted paths).
+  const directUrl =
+    !media && mediaId && (mediaId.startsWith("/") || mediaId.startsWith("http") || mediaId.startsWith("data:"))
+      ? mediaId
+      : undefined;
+
   if (media?.url && media.type === "video") {
     if (media.provider === "upload") {
       return (
@@ -62,6 +69,14 @@ export function ImagePlaceholder({ mediaId, label, className, rounded = "rounded
     return (
       <div className={cn("overflow-hidden", rounded, className)}>
         <img src={media.url} alt={resolvedLabel} loading="lazy" className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+
+  if (directUrl) {
+    return (
+      <div className={cn("overflow-hidden", rounded, className)}>
+        <img src={directUrl} alt={resolvedLabel} loading="lazy" className="h-full w-full object-cover" />
       </div>
     );
   }

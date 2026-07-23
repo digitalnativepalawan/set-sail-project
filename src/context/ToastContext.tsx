@@ -5,7 +5,7 @@ import { CheckCircle2, Info, X } from "lucide-react";
 interface Toast {
   id: number;
   message: string;
-  kind: "success" | "info";
+  kind: "success" | "info" | "error";
 }
 
 interface ToastContextValue {
@@ -41,6 +41,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             >
               {t.kind === "success" ? (
                 <CheckCircle2 className="h-4 w-4 text-[#C6A15B]" />
+              ) : t.kind === "error" ? (
+                <Info className="h-4 w-4 text-red-400" />
               ) : (
                 <Info className="h-4 w-4 text-[#C6A15B]" />
               )}
