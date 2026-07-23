@@ -20,6 +20,7 @@ import { useTalaVoice } from "./useTalaVoice";
 import { useSpeechInput } from "./useSpeechInput";
 import { useTalaKnowledge } from "./useTalaKnowledge";
 import { TALA_KOKORO_VOICES } from "./talaConfig";
+import { setTalaOpenListener, openTala } from "./talaOpen";
 
 // ---------------------------------------------------------------------------
 // TALA — floating AI concierge widget. Sits above the WhatsApp float on the
@@ -40,6 +41,23 @@ export function TalaWidget() {
   const [showSettings, setShowSettings] = useState(false);
   const [devKey, setDevKeyState] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const openAndPrefill = useCallback(
+    (message?: string) => {
+      setOpen(true);
+      if (message && message.trim()) {
+        // Seed the input and send immediately so TALA responds to the intent.
+        void submit(message);
+      }
+    },
+    [submit],
+  );
+
+  // Let any public CTA open TALA with a prefilled intent via openTala().
+  useEffect(() => {
+    setTalaOpenListener(openAndPrefill);
+    return () => setTalaOpenListener(null);
+  }, [openAndPrefill]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const chat = useTalaChat();

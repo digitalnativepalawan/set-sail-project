@@ -157,6 +157,35 @@ export const TALA_TOOL_SCHEMAS = [
       },
     },
   },
+  // ---- GUEST BOOKING REQUEST (anyone, including guests) --------------------
+  // Guests can ask TALA to start a booking, but it ALWAYS lands as `pending`
+  // — the human owner confirms in the admin before it becomes a real booking.
+  // This keeps TALA from double-booking: pending already blocks availability
+  // checks and other requests for the same room/dates.
+  {
+    type: "function",
+    function: {
+      name: "request_booking",
+      description:
+        "GUEST-SAFE. When a guest wants to book a room/stay (or a day/workspace pass handled as a short stay), create a booking REQUEST in status 'pending'. The owner confirms it in the admin before it is final — never confirm, cancel or change payment yourself. Match room names to those offered on the site. Requires guestName and dates.",
+      parameters: {
+        type: "object",
+        properties: {
+          guestName: { type: "string", description: "Guest's name." },
+          roomType: {
+            type: "string",
+            description: "Room or package name as listed, e.g. 'Superior Room UNO', 'Weekly Sprint', 'Day Pass'.",
+          },
+          checkIn: { type: "string", description: "Check-in date, ISO YYYY-MM-DD." },
+          checkOut: { type: "string", description: "Check-out date, ISO YYYY-MM-DD." },
+          guests: { type: "number", description: "Number of guests." },
+          amount: { type: "number", description: "Total amount in PHP if known." },
+          notes: { type: "string", description: "Optional notes from the guest." },
+        },
+        required: ["guestName", "roomType", "checkIn", "checkOut"],
+      },
+    },
+  },
 ] as const;
 
 export interface TalaToolCall {
@@ -418,6 +447,54 @@ function updateRental(args: Record<string, unknown>, ctx: TalaToolContext) {
   return { success: true, bike: match.name, newStatus: status };
 }
 
+// Guest-safe: anyone (guest or owner) can request a booking, but it ALWAYS
+// lands as `pending`. The owner confirms in the admin → flips to `confirmed`.
+// Because pending already blocks availability checks, this prevents
+// double-booking without letting the model confirm/cancel anything itself.
+function requestBooking(args: Record<string, unknown>, ctx: TalaToolContext) {
+  if (!ctx.update) {
+    return { error: "request_booking needs live site data." };
+  }
+  const checkIn = str(args.checkIn);
+  const checkOut = str(args.checkOut);
+  const roomType = str(args.roomType);
+  const guestName = str(args.guestName);
+  if (!checkIn || !checkOut || !roomType || !guestName) {
+    return { error: "Need guestName, roomType, checkIn and checkOut." };
+  }
+  const booking: CmsData["operations"]["bookings"][number] = {
+    id: uid("bkg"),
+    reference: generateReference("MT"),
+    guestId: "",
+    guestName,
+    roomType,
+    checkIn,
+    checkOut,
+    guests: num(args.guests, 1),
+    amount: num(args.amount, 0),
+    paidAmount: 0,
+    // Always pending — owner confirms.
+    status: "pending",
+    source: "tala_chat",
+    notes: str(args.notes),
+    createdAt: new Date().toISOString(),
+  };
+  ctx.update((d) => ({
+    ...d,
+    operations: { ...d.operations, bookings: [...d.operations.bookings, booking] },
+  }));
+  return {
+    success: true,
+    status: "pending",
+    reference: booking.reference,
+    guestName: booking.guestName,
+    roomType: booking.roomType,
+    checkIn: booking.checkIn,
+    checkOut: booking.checkOut,
+    message: "Booking request saved as PENDING — the team will confirm shortly.",
+  };
+}
+
 /** Runs one tool call and returns a JSON-serializable result for the model. */
 export async function executeTalaTool(
   call: TalaToolCall,
@@ -443,6 +520,8 @@ export async function executeTalaTool(
       return createTourBooking(args, ctx);
     case "update_rental":
       return updateRental(args, ctx);
+    case "request_booking":
+      return requestBooking(args, ctx);
     default:
       return { error: `Unknown tool: ${call.name}` };
   }
