@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Lightbulb,
   Loader2,
+  MessageCircle,
   Plus,
   Send,
   Sparkles,
@@ -24,11 +25,13 @@ import {
   addTalaGoal,
   addTalaTask,
   addTalaWin,
+  buildBriefingWhatsAppLink,
   fetchTalaBriefings,
   fetchTalaGoals,
   fetchTalaTasks,
   fetchTalaWins,
   generateTalaBriefing,
+  markBriefingWhatsappSent,
   type TalaBriefing,
   type TalaGoal,
   type TalaTask,
@@ -217,6 +220,21 @@ function BriefingTab({
     }
   }, [cms, notify, load]);
 
+  const sendToWhatsApp = useCallback(
+    async (b: TalaBriefing) => {
+      const link = buildBriefingWhatsAppLink(b, cms.settings.whatsapp);
+      if (!cms.settings.whatsapp.numbers.length) {
+        notify("No WhatsApp number set. Add one in Admin → WhatsApp.", "error");
+        return;
+      }
+      window.open(link, "_blank");
+      await markBriefingWhatsappSent(b.id);
+      notify("Opened WhatsApp with the briefing pre-filled.", "success");
+      load();
+    },
+    [cms.settings.whatsapp, notify, load],
+  );
+
   return (
     <div>
       <Card className="mb-6 p-6">
@@ -233,11 +251,25 @@ function BriefingTab({
             )}
             Generate briefing
           </Button>
+          {briefings && briefings.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => sendToWhatsApp(briefings[0])}
+            >
+              <MessageCircle className="h-4 w-4" />
+              Send to WhatsApp
+            </Button>
+          )}
         </div>
         {briefings && briefings.length > 0 ? (
           <div className="rounded-lg bg-[#FAF6EF] p-4">
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#26221C]/45">
               {briefings[0].brief_date}
+              {briefings[0].whatsapp_sent && (
+                <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+                  Sent to WhatsApp
+                </span>
+              )}
             </p>
             <p className="text-sm leading-relaxed text-[#26221C]">
               {briefings[0].summary}
@@ -271,7 +303,17 @@ function BriefingTab({
           <div className="space-y-3">
             {briefings.slice(1).map((b) => (
               <div key={b.id} className="rounded-lg border border-[#26221C]/10 p-3">
-                <p className="mb-1 text-xs font-medium text-[#26221C]/45">{b.brief_date}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="mb-1 text-xs font-medium text-[#26221C]/45">{b.brief_date}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[#C6A15B]"
+                    onClick={() => sendToWhatsApp(b)}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" /> Send
+                  </Button>
+                </div>
                 <p className="text-sm text-[#26221C]">{b.summary}</p>
               </div>
             ))}

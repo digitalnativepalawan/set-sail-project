@@ -34,6 +34,7 @@ export interface TalaBriefing {
   summary: string;
   highlights: string[];
   generated_at: string;
+  whatsapp_sent?: boolean;
 }
 
 export interface TalaWin {
@@ -143,6 +144,33 @@ export async function generateTalaBriefing(): Promise<TalaBriefing | null> {
   const { data, error } = await supabase.rpc("generate_tala_briefing");
   if (error || !data) return null;
   return data as TalaBriefing;
+}
+
+/** Mark a briefing as pushed to WhatsApp (so the UI can show sent state). */
+export async function markBriefingWhatsappSent(id: string): Promise<boolean> {
+  if (!isSupabaseConnected() || !supabase) return false;
+  const { error } = await supabase
+    .from("tala_briefings")
+    .update({ whatsapp_sent: true })
+    .eq("id", id);
+  return !error;
+}
+
+/**
+ * Build a wa.me deep link pre-filled with the briefing text, targeting the
+ * site's primary WhatsApp number. No API call — the admin taps it and WhatsApp
+ * opens with the message ready to send. Full auto-send (Baileys) is later.
+ */
+export function buildBriefingWhatsAppLink(
+  briefing: Pick<TalaBriefing, "summary" | "highlights">,
+  wa: { numbers: Array<{ number: string; isPrimary?: boolean }> },
+): string {
+  const primary =
+    wa.numbers.find((n) => n.isPrimary) || wa.numbers[0];
+  const digits = (primary?.number || "").replace(/[^0-9]/g, "");
+  const base = `https://wa.me/${digits}`;
+  const text = [briefing.summary, ...(briefing.highlights ?? [])].join("\n");
+  return text.trim() ? `${base}?text=${encodeURIComponent(text)}` : base;
 }
 
 export async function addTalaWin(input: {
