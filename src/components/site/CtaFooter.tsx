@@ -1,4 +1,4 @@
-import { MapPin, Phone, Mail } from "lucide-react";
+import { MapPin, Phone, Mail, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCms } from "@/context/CmsContext";
 import { safeHref, safeMailto, safeTel } from "@/lib/security";
