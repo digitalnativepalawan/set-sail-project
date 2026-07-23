@@ -229,7 +229,11 @@ export interface UseTalaChat {
     },
   ) => Promise<string | null>;
   /** Persists a guest-confirmed booking draft (the human Confirm action). */
-  confirmDraft: () => void;
+  confirmDraft: (
+    extra?: { email?: string; nomad?: boolean; working?: boolean; tours?: string[] },
+  ) => void;
+  /** Dismisses the pending draft card without confirming. */
+  clearDraft: () => void;
   reset: () => void;
 }
 
@@ -381,11 +385,31 @@ export function useTalaChat(): UseTalaChat {
     setPendingDraft(null);
   }, []);
 
-  const confirmDraft = useCallback(() => {
-    if (!pendingDraft) return;
-    confirmBookingDraft(pendingDraft, persistCms);
-    setPendingDraft(null);
-  }, [pendingDraft, persistCms]);
+  const clearDraft = useCallback(() => setPendingDraft(null), []);
 
-  return { messages, thinking, error, lastRun, send, reset, pendingDraft, confirmDraft };
+  const confirmDraft = useCallback(
+    (
+      extra?: { email?: string; nomad?: boolean; working?: boolean; tours?: string[] },
+    ) => {
+      if (!pendingDraft) return;
+      const notes = [
+        pendingDraft.notes,
+        extra?.email ? `Email: ${extra.email}` : "",
+        extra?.nomad ? "Digital nomad" : "",
+        extra?.working ? "Working while staying" : "",
+        extra?.tours?.length ? `Tours of interest: ${extra.tours.join(", ")}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      confirmBookingDraft(
+        { ...pendingDraft, notes },
+        persistCms,
+        options?.cms ? options.cms.settings.whatsapp : undefined,
+      );
+      setPendingDraft(null);
+    },
+    [pendingDraft, persistCms, options],
+  );
+
+  return { messages, thinking, error, lastRun, send, reset, clearDraft, pendingDraft, confirmDraft };
 }

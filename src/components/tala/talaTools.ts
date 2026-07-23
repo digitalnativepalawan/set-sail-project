@@ -647,6 +647,7 @@ export function confirmBookingDraft(
     notes: string;
   },
   update: (fn: (d: CmsData) => CmsData) => void,
+  whatsapp?: CmsData["settings"]["whatsapp"],
 ) {
   update((d) => {
     const exists = d.operations.bookings.some((b) => b.id === draft.id);
@@ -669,6 +670,21 @@ export function confirmBookingDraft(
       },
     };
   });
+  // Every confirmed booking draft is also a captured lead (email + context
+  // live in notes), so the team can follow up even before the owner approves.
+  try {
+    const email = (draft.notes.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)?.[0] || "").trim();
+    if (isSupabaseConnected() && supabase && (email || draft.guestName)) {
+      void supabase.from("tala_leads").insert({
+        name: draft.guestName,
+        contact: email.slice(0, 200),
+        note: `Booking draft ${draft.reference} (${draft.roomType}, ${draft.checkIn}→${draft.checkOut}): ${draft.notes}`.slice(0, 1000),
+        source: "booking_draft",
+      });
+    }
+  } catch {
+    // lead capture must never break the booking
+  }
   return { success: true, reference: draft.reference };
 }
 
