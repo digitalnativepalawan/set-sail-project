@@ -34,6 +34,7 @@ import {
   Zap,
   Bot,
   BookOpen,
+  Brain,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCms } from "@/context/CmsContext";
@@ -90,6 +91,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
       { to: "/admin/tala", label: "TALA (AI Concierge)", icon: Bot },
       { to: "/admin/tala/knowledge", label: "TALA Knowledge Base", icon: BookOpen },
+      { to: "/admin/tala/ops", label: "TALA Operations", icon: Brain },
       { to: "/admin/seo", label: "SEO", icon: Search },
       { to: "/admin/appearance", label: "Appearance", icon: Palette },
       { to: "/admin/settings", label: "Settings", icon: Settings },

@@ -1,0 +1,161 @@
+import { supabase, isSupabaseConnected } from "@/lib/supabase";
+
+// ---------------------------------------------------------------------------
+// TALA Operations Console — data layer for the admin-side TALA workspace
+// (operator face). Goals / Tasks / Briefings / Wins live in their own tables
+// (see supabase/migrations/20260723090000_create_tala_ops.sql) so bulk
+// reads/writes here never touch the monolithic cms_data blob.
+//
+// Policy mirrors tala_leads: anon can SELECT + INSERT, never UPDATE/DELETE,
+// so a visitor can only ever append rows. The admin passkey guards the UI.
+// ---------------------------------------------------------------------------
+
+export interface TalaGoal {
+  id: string;
+  title: string;
+  description: string;
+  status: "active" | "done";
+  target_date: string;
+  created_at: string;
+}
+
+export interface TalaTask {
+  id: string;
+  title: string;
+  due: string;
+  status: "pending" | "done";
+  category: "general" | "booking" | "tour" | "staff" | "maintenance";
+  created_at: string;
+}
+
+export interface TalaBriefing {
+  id: string;
+  brief_date: string;
+  summary: string;
+  highlights: string[];
+  generated_at: string;
+}
+
+export interface TalaWin {
+  id: string;
+  brief_date: string;
+  text: string;
+  created_at: string;
+}
+
+/** Append a goal. Returns the new row or null on failure. */
+export async function addTalaGoal(input: {
+  title: string;
+  description?: string;
+  target_date?: string;
+}): Promise<TalaGoal | null> {
+  if (!isSupabaseConnected() || !supabase) return null;
+  const { data, error } = await supabase
+    .from("tala_goals")
+    .insert({
+      title: input.title.slice(0, 300),
+      description: (input.description ?? "").slice(0, 2000),
+      target_date: input.target_date ?? "",
+      status: "active",
+    })
+    .select()
+    .single();
+  if (error || !data) return null;
+  return data as TalaGoal;
+}
+
+export async function fetchTalaGoals(): Promise<TalaGoal[]> {
+  if (!isSupabaseConnected() || !supabase) return [];
+  const { data, error } = await supabase
+    .from("tala_goals")
+    .select("id,title,description,status,target_date,created_at")
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data as TalaGoal[];
+}
+
+export async function addTalaTask(input: {
+  title: string;
+  due?: string;
+  category?: TalaTask["category"];
+}): Promise<TalaTask | null> {
+  if (!isSupabaseConnected() || !supabase) return null;
+  const { data, error } = await supabase
+    .from("tala_tasks")
+    .insert({
+      title: input.title.slice(0, 300),
+      due: input.due ?? "",
+      category: input.category ?? "general",
+      status: "pending",
+    })
+    .select()
+    .single();
+  if (error || !data) return null;
+  return data as TalaTask;
+}
+
+export async function fetchTalaTasks(): Promise<TalaTask[]> {
+  if (!isSupabaseConnected() || !supabase) return [];
+  const { data, error } = await supabase
+    .from("tala_tasks")
+    .select("id,title,due,status,category,created_at")
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data as TalaTask[];
+}
+
+export async function addTalaBriefing(input: {
+  brief_date: string;
+  summary: string;
+  highlights: string[];
+}): Promise<TalaBriefing | null> {
+  if (!isSupabaseConnected() || !supabase) return null;
+  const { data, error } = await supabase
+    .from("tala_briefings")
+    .insert({
+      brief_date: input.brief_date,
+      summary: input.summary.slice(0, 4000),
+      highlights: input.highlights.slice(0, 20),
+    })
+    .select()
+    .single();
+  if (error || !data) return null;
+  return data as TalaBriefing;
+}
+
+export async function fetchTalaBriefings(): Promise<TalaBriefing[]> {
+  if (!isSupabaseConnected() || !supabase) return [];
+  const { data, error } = await supabase
+    .from("tala_briefings")
+    .select("id,brief_date,summary,highlights,generated_at")
+    .order("generated_at", { ascending: false });
+  if (error || !data) return [];
+  return data as TalaBriefing[];
+}
+
+export async function addTalaWin(input: {
+  brief_date: string;
+  text: string;
+}): Promise<TalaWin | null> {
+  if (!isSupabaseConnected() || !supabase) return null;
+  const { data, error } = await supabase
+    .from("tala_wins")
+    .insert({
+      brief_date: input.brief_date,
+      text: input.text.slice(0, 2000),
+    })
+    .select()
+    .single();
+  if (error || !data) return null;
+  return data as TalaWin;
+}
+
+export async function fetchTalaWins(): Promise<TalaWin[]> {
+  if (!isSupabaseConnected() || !supabase) return [];
+  const { data, error } = await supabase
+    .from("tala_wins")
+    .select("id,brief_date,text,created_at")
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data as TalaWin[];
+}
