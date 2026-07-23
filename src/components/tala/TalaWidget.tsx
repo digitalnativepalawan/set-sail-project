@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Loader2,
   Mic,
@@ -53,22 +53,6 @@ export function TalaWidget() {
   } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const openAndPrefill = useCallback(
-    (message?: string) => {
-      setOpen(true);
-      if (message && message.trim()) {
-        // Seed the input and send immediately so TALA responds to the intent.
-        void submit(message);
-      }
-    },
-    [submit],
-  );
-
-  // Let any public CTA open TALA with a prefilled intent via openTala().
-  useEffect(() => {
-    setTalaOpenListener(openAndPrefill);
-    return () => setTalaOpenListener(null);
-  }, [openAndPrefill]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const chat = useTalaChat();
@@ -105,6 +89,23 @@ export function TalaWidget() {
     });
     if (reply) voice.speak(reply);
   };
+
+  const openAndPrefill = useCallback(
+    (message?: string) => {
+      setOpen(true);
+      if (message && message.trim()) {
+        // Seed the input and send immediately so TALA responds to the intent.
+        void submit(message);
+      }
+    },
+    [submit],
+  );
+
+  // Let any public CTA open TALA with a prefilled intent via openTala().
+  useEffect(() => {
+    setTalaOpenListener(openAndPrefill);
+    return () => setTalaOpenListener(null);
+  }, [openAndPrefill]);
 
   const speech = useSpeechInput((finalText) => void submit(finalText));
 

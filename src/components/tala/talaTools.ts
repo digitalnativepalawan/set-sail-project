@@ -1,4 +1,4 @@
-import type { CmsData } from "@/types/cms";
+import type { BookingSource, CmsData, Payment, PaymentMethod } from "@/types/cms";
 import { supabase, isSupabaseConnected } from "@/lib/supabase";
 import { uid, generateReference, todayISO } from "@/admin/ops/opsUtils";
 
@@ -265,6 +265,28 @@ function num(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function bookingSource(value: unknown): BookingSource {
+  const source = str(value, "whatsapp");
+  const allowed: BookingSource[] = [
+    "whatsapp",
+    "direct",
+    "airbnb",
+    "agoda",
+    "booking.com",
+    "walk_in",
+    "referral",
+    "other",
+  ];
+  return allowed.includes(source as BookingSource) ? (source as BookingSource) : "other";
+}
+
+function paymentMethod(value: unknown, fallback: PaymentMethod = "cash"): PaymentMethod {
+  const method = str(value, fallback);
+  if (method === "bank") return "bank_transfer";
+  const allowed: PaymentMethod[] = ["cash", "gcash", "bank_transfer", "card", "paypal", "other"];
+  return allowed.includes(method as PaymentMethod) ? (method as PaymentMethod) : fallback;
+}
+
 function checkRoomAvailability(args: Record<string, unknown>, cms: CmsData) {
   const checkIn = parseDate(args.checkIn);
   const checkOut = parseDate(args.checkOut);
@@ -378,7 +400,7 @@ function createBooking(args: Record<string, unknown>, ctx: TalaToolContext) {
     amount: num(args.amount, 0),
     paidAmount: 0,
     status: "confirmed",
-    source: (str(args.source, "whatsapp") as CmsData["operations"]["bookings"][number]["source"]) || "whatsapp",
+    source: bookingSource(args.source),
     notes: str(args.notes),
     createdAt: new Date().toISOString(),
   };
@@ -400,7 +422,7 @@ function updateBooking(args: Record<string, unknown>, ctx: TalaToolContext) {
   if (!ctx.owner || !ctx.update) {
     return { error: "update_booking is owner-only and requires live owner mode." };
   }
-  const found = findBooking(ctx.cms, args.reference, args.guestName);
+  const found = findBooking(ctx.cms, str(args.reference), str(args.guestName));
   if (!found) {
     return { error: "No booking matched that reference or guest name." };
   }
@@ -529,7 +551,7 @@ function requestBooking(args: Record<string, unknown>, ctx: TalaToolContext) {
     amount: num(args.amount, 0),
     paidAmount: 0,
     status: "pending",
-    source: "tala_chat",
+    source: "other",
     notes: str(args.notes),
     createdAt: new Date().toISOString(),
   };
@@ -600,7 +622,7 @@ export function confirmBookingDraft(
             guestId: "",
             paidAmount: 0,
             status: "pending",
-            source: "tala_chat",
+            source: "other",
             createdAt: new Date().toISOString(),
           } as CmsData["operations"]["bookings"][number],
         ],
@@ -629,6 +651,8 @@ function computeHours(startTime: string, endTime: string): number {
 function runPayroll(args: Record<string, unknown>, ctx: TalaToolContext) {
   const deny = requireOwner(ctx);
   if (deny) return { error: deny };
+  const update = ctx.update;
+  if (!update) return { error: "Owner update channel is unavailable." };
   const periodStart = str(args.periodStart);
   const periodEnd = str(args.periodEnd);
   if (!periodStart || !periodEnd) return { error: "Need periodStart and periodEnd." };
@@ -662,7 +686,7 @@ function runPayroll(args: Record<string, unknown>, ctx: TalaToolContext) {
     });
   }
   if (created.length === 0) return { success: true, created: 0, total: 0, message: "No billable shifts in that period." };
-  ctx.update((d) => ({
+  update((d) => ({
     ...d,
     operations: { ...d.operations, payRecords: [...d.operations.payRecords, ...created] },
   }));
@@ -677,13 +701,15 @@ function runPayroll(args: Record<string, unknown>, ctx: TalaToolContext) {
 function markPayRecordPaid(args: Record<string, unknown>, ctx: TalaToolContext) {
   const deny = requireOwner(ctx);
   if (deny) return { error: deny };
+  const update = ctx.update;
+  if (!update) return { error: "Owner update channel is unavailable." };
   const id = str(args.payRecordId);
-  const method = str(args.method, "cash");
+  const method = paymentMethod(args.method);
   if (!id) return { error: "Need payRecordId." };
   let done = false;
   let amount = 0;
   let name = "";
-  ctx.update((d) => {
+  update((d) => {
     const rec = d.operations.payRecords.find((p) => p.id === id);
     if (!rec) return d;
     done = true;
@@ -705,7 +731,7 @@ function markPayRecordPaid(args: Record<string, unknown>, ctx: TalaToolContext) 
             category: "expense",
             direction: "out",
             amount,
-            method: method as PaymentMethod,
+            method,
             relatedId: id,
             description: `Salary: ${name}`,
             notes: "",
@@ -721,10 +747,12 @@ function markPayRecordPaid(args: Record<string, unknown>, ctx: TalaToolContext) 
 function logPayment(args: Record<string, unknown>, ctx: TalaToolContext) {
   const deny = requireOwner(ctx);
   if (deny) return { error: deny };
+  const update = ctx.update;
+  if (!update) return { error: "Owner update channel is unavailable." };
   const direction = str(args.direction);
   const category = str(args.category);
   const amount = num(args.amount, 0);
-  const method = str(args.method, "cash");
+  const method = paymentMethod(args.method);
   const description = str(args.description);
   if (!["in", "out"].includes(direction)) return { error: "direction must be 'in' or 'out'." };
   if (amount <= 0) return { error: "amount must be > 0." };
@@ -735,12 +763,12 @@ function logPayment(args: Record<string, unknown>, ctx: TalaToolContext) {
     category: (["booking", "tour", "rental", "other", "expense"].includes(category) ? category : "other") as Payment["category"],
     direction: direction as "in" | "out",
     amount,
-    method: (["cash", "card", "gcash", "bank", "other"].includes(method) ? method : "cash") as PaymentMethod,
+    method,
     relatedId: str(args.relatedId),
     description,
     notes: "",
   };
-  ctx.update((d) => ({
+  update((d) => ({
     ...d,
     operations: { ...d.operations, payments: [...d.operations.payments, payment] },
   }));

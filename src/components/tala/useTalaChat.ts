@@ -8,7 +8,12 @@ import {
   TALA_SUPABASE_ANON_KEY,
   type TalaMessage,
 } from "./talaConfig";
-import { executeTalaTool, confirmBookingDraft, type TalaToolContext } from "./talaTools";
+import {
+  TALA_TOOL_SCHEMAS,
+  executeTalaTool,
+  confirmBookingDraft,
+  type TalaToolContext,
+} from "./talaTools";
 import {
   classifyHeuristically,
   parseClassification,
@@ -260,7 +265,7 @@ export function useTalaChat(): UseTalaChat {
     async (
       text: string,
       systemPrompt: string,
-      options?: { model?: string; adminApiKey?: string; cms?: CmsData },
+      options?: { model?: string; adminApiKey?: string; cms?: CmsData; owner?: boolean },
     ): Promise<string | null> => {
       const trimmed = text.trim();
       if (!trimmed || inFlight.current) return null;
@@ -358,7 +363,7 @@ export function useTalaChat(): UseTalaChat {
         setThinking(false);
       }
     },
-    [],
+    [persistCms],
   );
 
   const reset = useCallback(() => {
@@ -373,7 +378,7 @@ export function useTalaChat(): UseTalaChat {
     if (!pendingDraft) return;
     confirmBookingDraft(pendingDraft, persistCms);
     setPendingDraft(null);
-  }, [pendingDraft]);
+  }, [pendingDraft, persistCms]);
 
   return { messages, thinking, error, lastRun, send, reset, pendingDraft, confirmDraft };
 }
