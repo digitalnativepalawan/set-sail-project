@@ -225,6 +225,12 @@ export interface UseTalaVoiceOptions {
   ttsModelId?: string;
   /** Voice id for the chosen TTS model (each model defines its own set). */
   ttsVoiceId?: string;
+  /**
+   * When true (public site), the visitor's own localStorage voice choice is
+   * IGNORED and TALA always speaks with the owner's Admin-selected voice.
+   * The owner's Admin console passes false so it can preview/change voices.
+   */
+  ignoreLocalVoice?: boolean;
 }
 
 export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
@@ -243,6 +249,9 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
   const [status, setStatus] = useState<TalaVoiceStatus>("idle");
   const [loadProgress, setLoadProgress] = useState<number | null>(null);
   const [voiceId, setVoiceIdState] = useState<string>(() => {
+    // On the public site (ignoreLocalVoice), the owner's Admin-selected voice
+    // is the single source of truth — never a visitor's stale localStorage pick.
+    if (options?.ignoreLocalVoice) return siteDefaultVoice;
     try {
       return localStorage.getItem(TALA_STORAGE.voiceId) || siteDefaultVoice;
     } catch {

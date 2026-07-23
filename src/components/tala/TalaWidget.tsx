@@ -50,6 +50,7 @@ export function TalaWidget() {
     apiKey: data.settings.tala.apiKey || undefined,
     ttsModelId: data.settings.tala.ttsModelId || undefined,
     ttsVoiceId: data.settings.tala.ttsVoiceId || undefined,
+    ignoreLocalVoice: true,
   });
   const knowledge = useTalaKnowledge();
 
@@ -219,18 +220,17 @@ export function TalaWidget() {
               style={{ borderColor: `${GOLD}33`, color: INK }}
             >
               <label className="mb-1 block font-medium">Voice</label>
-              <select
-                value={voice.voiceId}
-                onChange={(e) => voice.setVoiceId(e.target.value)}
-                className="mb-3 w-full rounded-md border bg-white px-2 py-1.5"
+              {/* Read-only: TALA's voice is owner-controlled in Admin → TALA.
+                  Visitors (including foreigners on their own devices) must NOT
+                  be able to override it, so we show the active voice but don't
+                  let them change it — the gear is a dev/diagnostic panel only. */}
+              <div
+                className="mb-3 w-full rounded-md border bg-white/60 px-2 py-1.5"
                 style={{ borderColor: `${GOLD}55` }}
               >
-                {TALA_KOKORO_VOICES.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
+                {TALA_KOKORO_VOICES.find((v) => v.id === voice.voiceId)?.label ?? voice.voiceId}
+                <span className="ml-1 opacity-50">(set in Admin)</span>
+              </div>
               <label className="mb-1 block font-medium">
                 Dev OpenRouter key{" "}
                 <span className="font-normal opacity-60">
