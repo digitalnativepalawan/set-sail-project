@@ -104,11 +104,18 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.generate_tala_briefing() TO postgres, service_role;
 
 -- 3) Schedule it daily at 07:00 Asia/Manila (23:00 UTC). Idempotent: remove
---    any prior copy with this name, then (re)create. pg_cron's objects live in
---    the "cron" schema.
-DELETE FROM cron.job WHERE jobname = 'tala_daily_briefing';
-SELECT cron.schedule(
-  'tala_daily_briefing',
-  '0 23 * * *',
-  'SELECT public.generate_tala_briefing();'
-);
+--    any prior copy with this name, then recreate. Use cron.unschedule /
+--    cron.schedule (the documented API) — direct DML on cron.job is denied.
+DO $$
+BEGIN
+  BEGIN
+    PERFORM cron.unschedule('tala_daily_briefing');
+  EXCEPTION WHEN OTHERS THEN
+    NULL; -- job didn't exist yet — fine
+  END;
+  PERFORM cron.schedule(
+    'tala_daily_briefing',
+    '0 23 * * *',
+    'SELECT public.generate_tala_briefing();'
+  );
+END $$;
