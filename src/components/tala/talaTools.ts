@@ -157,17 +157,20 @@ export const TALA_TOOL_SCHEMAS = [
       },
     },
   },
-  // ---- GUEST BOOKING REQUEST (anyone, including guests) --------------------
-  // Guests can ask TALA to start a booking, but it ALWAYS lands as `pending`
-  // — the human owner confirms in the admin before it becomes a real booking.
-  // This keeps TALA from double-booking: pending already blocks availability
-  // checks and other requests for the same room/dates.
+  // ---- GUEST BOOKING DRAFT (anyone, including guests) -------------------
+  // When a guest wants to book, TALA first calls this to build a DRAFT booking
+  // (status still 'pending'). The widget renders the draft as a verification
+  // card the guest must confirm. The guest can NEVER write to the store
+  // directly — confirming the card is the human action that persists it. This
+  // prevents TALA from booking on its own; you (owner) still confirm in admin
+  // before it becomes real. Pending already blocks availability, so no
+  // double-booking while a draft waits for confirmation.
   {
     type: "function",
     function: {
       name: "request_booking",
       description:
-        "GUEST-SAFE. When a guest wants to book a room/stay (or a day/workspace pass handled as a short stay), create a booking REQUEST in status 'pending'. The owner confirms it in the admin before it is final — never confirm, cancel or change payment yourself. Match room names to those offered on the site. Requires guestName and dates.",
+        "GUEST-SAFE DRAFT. When a guest wants to book a room/stay (or a day/workspace pass treated as a short stay), build a booking DRAFT in status 'pending'. It is shown to the guest for confirmation — never confirmed, cancelled or paid by you. Match room names to those on the site. Requires guestName and dates.",
       parameters: {
         type: "object",
         properties: {
@@ -447,14 +450,12 @@ function updateRental(args: Record<string, unknown>, ctx: TalaToolContext) {
   return { success: true, bike: match.name, newStatus: status };
 }
 
-// Guest-safe: anyone (guest or owner) can request a booking, but it ALWAYS
-// lands as `pending`. The owner confirms in the admin → flips to `confirmed`.
-// Because pending already blocks availability checks, this prevents
-// double-booking without letting the model confirm/cancel anything itself.
+// Guest-safe DRAFT: TALA builds the booking but does NOT write it. The
+// widget renders the returned `draft` as a verification card; the guest taps
+// Confirm (a real human action) which persists the pending booking via
+// ctx.update. Because pending already blocks availability, no double-booking.
+// If an owner calls it (ctx.owner), it persists immediately.
 function requestBooking(args: Record<string, unknown>, ctx: TalaToolContext) {
-  if (!ctx.update) {
-    return { error: "request_booking needs live site data." };
-  }
   const checkIn = str(args.checkIn);
   const checkOut = str(args.checkOut);
   const roomType = str(args.roomType);
@@ -473,26 +474,86 @@ function requestBooking(args: Record<string, unknown>, ctx: TalaToolContext) {
     guests: num(args.guests, 1),
     amount: num(args.amount, 0),
     paidAmount: 0,
-    // Always pending — owner confirms.
     status: "pending",
     source: "tala_chat",
     notes: str(args.notes),
     createdAt: new Date().toISOString(),
   };
-  ctx.update((d) => ({
-    ...d,
-    operations: { ...d.operations, bookings: [...d.operations.bookings, booking] },
-  }));
+
+  // Owner (operator face) persists right away; guests only get a draft.
+  if (ctx.owner && ctx.update) {
+    ctx.update((d) => ({
+      ...d,
+      operations: { ...d.operations, bookings: [...d.operations.bookings, booking] },
+    }));
+    return {
+      success: true,
+      status: "pending",
+      reference: booking.reference,
+      guestName: booking.guestName,
+      roomType: booking.roomType,
+      checkIn: booking.checkIn,
+      checkOut: booking.checkOut,
+      message: "Booking request saved as PENDING — the team will confirm shortly.",
+    };
+  }
+
+  // Guest / draft mode — hand back the draft for the widget to confirm.
   return {
-    success: true,
-    status: "pending",
-    reference: booking.reference,
-    guestName: booking.guestName,
-    roomType: booking.roomType,
-    checkIn: booking.checkIn,
-    checkOut: booking.checkOut,
-    message: "Booking request saved as PENDING — the team will confirm shortly.",
+    draft: {
+      id: booking.id,
+      reference: booking.reference,
+      guestName: booking.guestName,
+      roomType: booking.roomType,
+      checkIn: booking.checkIn,
+      checkOut: booking.checkOut,
+      guests: booking.guests,
+      amount: booking.amount,
+      notes: booking.notes,
+    },
+    message: "Here is your booking draft — please confirm the details.",
   };
+}
+
+// Persists a guest-confirmed draft. Called by the widget's Confirm button
+// (the human action). Guests can only reach this through that button, never
+// via the model.
+export function confirmBookingDraft(
+  draft: {
+    id: string;
+    reference: string;
+    guestName: string;
+    roomType: string;
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    amount: number;
+    notes: string;
+  },
+  update: (fn: (d: CmsData) => CmsData) => void,
+) {
+  update((d) => {
+    const exists = d.operations.bookings.some((b) => b.id === draft.id);
+    if (exists) return d;
+    return {
+      ...d,
+      operations: {
+        ...d.operations,
+        bookings: [
+          ...d.operations.bookings,
+          {
+            ...draft,
+            guestId: "",
+            paidAmount: 0,
+            status: "pending",
+            source: "tala_chat",
+            createdAt: new Date().toISOString(),
+          } as CmsData["operations"]["bookings"][number],
+        ],
+      },
+    };
+  });
+  return { success: true, reference: draft.reference };
 }
 
 /** Runs one tool call and returns a JSON-serializable result for the model. */

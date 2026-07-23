@@ -8,7 +8,7 @@ import {
   TALA_SUPABASE_ANON_KEY,
   type TalaMessage,
 } from "./talaConfig";
-import { executeTalaTool, type TalaToolContext } from "./talaTools";
+import { executeTalaTool, confirmBookingDraft, type TalaToolContext } from "./talaTools";
 import {
   classifyHeuristically,
   parseClassification,
@@ -207,6 +207,8 @@ export interface UseTalaChat {
   messages: TalaMessage[];
   thinking: boolean;
   error: string | null;
+  /** Booking draft returned by request_booking (guest mode) awaiting confirm. */
+  pendingDraft: BookingDraft | null;
   /** Classification + tools from the most recent completed turn (agent-graph telemetry). */
   lastRun: TalaRunInfo | null;
   send: (
@@ -220,7 +222,21 @@ export interface UseTalaChat {
       owner?: boolean;
     },
   ) => Promise<string | null>;
+  /** Persists a guest-confirmed booking draft (the human Confirm action). */
+  confirmDraft: () => void;
   reset: () => void;
+}
+
+interface BookingDraft {
+  id: string;
+  reference: string;
+  guestName: string;
+  roomType: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  amount: number;
+  notes: string;
 }
 
 export function useTalaChat(): UseTalaChat {
@@ -228,6 +244,7 @@ export function useTalaChat(): UseTalaChat {
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<TalaRunInfo | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<BookingDraft | null>(null);
   const inFlight = useRef(false);
   // Use the shared CMS store so owner-mode writes persist exactly like the
   // admin managers do (through CmsContext -> cms_data).
@@ -304,6 +321,9 @@ export function useTalaChat(): UseTalaChat {
                   } satisfies TalaToolContext,
                 )
               : { error: "Tool unavailable — no site data loaded." };
+            // Surface a guest booking draft so the widget can show a confirm card.
+            const draft = (result as { draft?: BookingDraft }).draft;
+            if (draft) setPendingDraft(draft);
             wire.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
           }
           reply = await requestReply(wire);
@@ -346,7 +366,14 @@ export function useTalaChat(): UseTalaChat {
     setMessages([]);
     setError(null);
     setLastRun(null);
+    setPendingDraft(null);
   }, []);
 
-  return { messages, thinking, error, lastRun, send, reset };
+  const confirmDraft = useCallback(() => {
+    if (!pendingDraft) return;
+    confirmBookingDraft(pendingDraft, persistCms);
+    setPendingDraft(null);
+  }, [pendingDraft]);
+
+  return { messages, thinking, error, lastRun, send, reset, pendingDraft, confirmDraft };
 }

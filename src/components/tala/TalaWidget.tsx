@@ -40,6 +40,17 @@ export function TalaWidget() {
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [devKey, setDevKeyState] = useState("");
+  const [pendingDraft, setPendingDraft] = useState<{
+    id: string;
+    reference: string;
+    guestName: string;
+    roomType: string;
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    amount: number;
+    notes: string;
+  } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const openAndPrefill = useCallback(
@@ -278,6 +289,50 @@ export function TalaWidget() {
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                 {chat.error}
               </p>
+            )}
+
+            {/* Guest booking verification card — TALA drafted it, guest confirms */}
+            {pendingDraft && (
+              <div
+                className="mx-1 rounded-xl border-2 px-3.5 py-3"
+                style={{ borderColor: GOLD, backgroundColor: "#FFFFFF", color: INK }}
+              >
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: GOLD }}>
+                  <Sparkles className="h-3.5 w-3.5" /> Booking request
+                </p>
+                <dl className="space-y-1 text-sm">
+                  <div className="flex justify-between gap-2"><dt className="opacity-60">Name</dt><dd className="font-medium">{pendingDraft.guestName}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="opacity-60">Room / Plan</dt><dd className="font-medium text-right">{pendingDraft.roomType}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="opacity-60">Check-in</dt><dd className="font-medium">{pendingDraft.checkIn}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="opacity-60">Check-out</dt><dd className="font-medium">{pendingDraft.checkOut}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="opacity-60">Guests</dt><dd className="font-medium">{pendingDraft.guests}</dd></div>
+                  {pendingDraft.amount > 0 && (
+                    <div className="flex justify-between gap-2"><dt className="opacity-60">Amount</dt><dd className="font-medium">₱{pendingDraft.amount.toLocaleString()}</dd></div>
+                  )}
+                  {pendingDraft.notes && (
+                    <div className="flex justify-between gap-2"><dt className="opacity-60">Notes</dt><dd className="font-medium text-right">{pendingDraft.notes}</dd></div>
+                  )}
+                </dl>
+                <p className="mt-2 text-[11px] opacity-60">Pending — the team confirms after you submit.</p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => chat.confirmDraft()}
+                    className="flex-1 rounded-full py-2 text-xs font-semibold text-white transition-colors hover:opacity-90"
+                    style={{ backgroundColor: GREEN }}
+                  >
+                    Confirm booking
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDraft(null)}
+                    className="rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-black/5"
+                    style={{ borderColor: `${GOLD}55` }}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Fallback to a human — always available, and the safety net when
