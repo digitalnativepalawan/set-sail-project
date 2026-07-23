@@ -8,7 +8,7 @@ import {
   TALA_SUPABASE_ANON_KEY,
   type TalaMessage,
 } from "./talaConfig";
-import { executeTalaTool, TALA_TOOL_SCHEMAS } from "./talaTools";
+import { executeTalaTool, type TalaToolContext } from "./talaTools";
 import {
   classifyHeuristically,
   parseClassification,
@@ -16,6 +16,7 @@ import {
   TALA_CLASSIFY_PROMPT,
   type TalaClassification,
 } from "./talaGraph";
+import { useCms } from "@/context/CmsContext";
 import type { CmsData } from "@/types/cms";
 
 interface ToolCallWire {
@@ -211,7 +212,13 @@ export interface UseTalaChat {
   send: (
     text: string,
     systemPrompt: string,
-    options?: { model?: string; adminApiKey?: string; cms?: CmsData },
+    options?: {
+      model?: string;
+      adminApiKey?: string;
+      cms?: CmsData;
+      /** Operator face only — allows TALA to write bookings/tours/rentals. */
+      owner?: boolean;
+    },
   ) => Promise<string | null>;
   reset: () => void;
 }
@@ -222,6 +229,9 @@ export function useTalaChat(): UseTalaChat {
   const [error, setError] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<TalaRunInfo | null>(null);
   const inFlight = useRef(false);
+  // Use the shared CMS store so owner-mode writes persist exactly like the
+  // admin managers do (through CmsContext -> cms_data).
+  const { update: persistCms } = useCms();
   // Authoritative copy of the conversation. React state updaters are NOT
   // guaranteed to run synchronously at the setMessages() call site, so
   // building the outgoing request from inside one silently dropped the
@@ -287,7 +297,11 @@ export function useTalaChat(): UseTalaChat {
             const result = options?.cms
               ? await executeTalaTool(
                   { id: call.id, name: call.function.name, arguments: call.function.arguments },
-                  options.cms,
+                  {
+                    cms: options.cms,
+                    update: options.owner ? persistCms : undefined,
+                    owner: !!options.owner,
+                  } satisfies TalaToolContext,
                 )
               : { error: "Tool unavailable — no site data loaded." };
             wire.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
