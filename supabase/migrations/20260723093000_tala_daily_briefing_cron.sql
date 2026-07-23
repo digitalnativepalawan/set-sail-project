@@ -12,7 +12,7 @@
 -- 1) Enable the pg_cron extension (must exist before we can read cron.job
 --    or call cron.schedule). If this line errors with "permission denied",
 --    enable pg_cron from the Supabase Dashboard → Extensions page instead.
-CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 -- 2) The briefing generator. Mirrors OperationsDashboard.tsx math.
 CREATE OR REPLACE FUNCTION public.generate_tala_briefing()
@@ -104,10 +104,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.generate_tala_briefing() TO postgres, service_role;
 
 -- 3) Schedule it daily at 07:00 Asia/Manila (23:00 UTC). Idempotent: remove
---    any prior copy with this name, then (re)create. The cron.job table lives
---    in the extension's schema, so qualify it as extensions.cron_job.
-DELETE FROM extensions.cron_job WHERE jobname = 'tala_daily_briefing';
-SELECT extensions.cron_schedule(
+--    any prior copy with this name, then (re)create. pg_cron's objects live in
+--    the "cron" schema.
+DELETE FROM cron.job WHERE jobname = 'tala_daily_briefing';
+SELECT cron.schedule(
   'tala_daily_briefing',
   '0 23 * * *',
   'SELECT public.generate_tala_briefing();'
