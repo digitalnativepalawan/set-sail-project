@@ -34,11 +34,12 @@ export const OPENROUTER_TTS_ENDPOINT = "https://openrouter.ai/api/v1/audio/speec
  * The edge function shares this list; update both together.
  */
 export const TALA_FREE_MODELS = [
-  "deepseek/deepseek-chat-v3-0324:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "qwen/qwen3-235b-a22b:free",
-  "google/gemini-2.0-flash-exp:free",
-  "mistralai/mistral-small-3.1-24b-instruct:free",
+  "openai/gpt-oss-20b:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-nano-12b-v2-vl:free",
+  "cohere/north-mini-code:free",
 ] as const;
 
 /** localStorage keys (device-local preferences, never synced). */

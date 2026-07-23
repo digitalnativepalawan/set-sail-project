@@ -31,11 +31,12 @@ import { z } from "npm:zod@3.25.28";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const FREE_MODELS = [
-  "deepseek/deepseek-chat-v3-0324:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "qwen/qwen3-235b-a22b:free",
-  "google/gemini-2.0-flash-exp:free",
-  "mistralai/mistral-small-3.1-24b-instruct:free",
+  "openai/gpt-oss-20b:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-nano-12b-v2-vl:free",
+  "cohere/north-mini-code:free",
 ];
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
@@ -486,9 +487,14 @@ export async function handleRequest(req: Request): Promise<Response> {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    // Never leak a raw OpenRouter model slug to the guest — strip model
+    // identifiers and show a calm, human message instead.
+    const safeMessage = message
+      .replace(/[a-z0-9._/-]+:[a-z0-9._-]+/gi, "a model")
+      .slice(0, 140);
     return json(
       {
-        error: `TALA's free models are all busy right now — please try again in a moment. (${message})`,
+        error: `TALA's free models are all busy right now — please try again in a moment. (${safeMessage})`,
       },
       503,
     );
