@@ -163,6 +163,7 @@ export type Database = {
           name: string
           note: string
           source: string
+          source_url: string
         }
         Insert: {
           contact?: string
@@ -171,6 +172,7 @@ export type Database = {
           name?: string
           note?: string
           source?: string
+          source_url?: string
         }
         Update: {
           contact?: string
@@ -179,6 +181,7 @@ export type Database = {
           name?: string
           note?: string
           source?: string
+          source_url?: string
         }
         Relationships: []
       }
