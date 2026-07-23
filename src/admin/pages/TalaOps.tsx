@@ -28,6 +28,7 @@ import {
   fetchTalaGoals,
   fetchTalaTasks,
   fetchTalaWins,
+  generateTalaBriefing,
   type TalaBriefing,
   type TalaGoal,
   type TalaTask,
@@ -196,12 +197,17 @@ function BriefingTab({
 
   const generate = useCallback(async () => {
     setGenerating(true);
-    const snap = computeBriefing(cms);
-    const saved = await addTalaBriefing({
-      brief_date: snap.briefDate,
-      summary: snap.summary,
-      highlights: snap.highlights,
-    });
+    // Prefer the server-side SQL function (same logic as the daily cron).
+    let saved = await generateTalaBriefing();
+    // Fallback: if the RPC isn't deployed yet, compute in-browser + insert.
+    if (!saved) {
+      const snap = computeBriefing(cms);
+      saved = await addTalaBriefing({
+        brief_date: snap.briefDate,
+        summary: snap.summary,
+        highlights: snap.highlights,
+      });
+    }
     setGenerating(false);
     if (saved) {
       notify("Morning briefing saved.", "success");

@@ -133,6 +133,18 @@ export async function fetchTalaBriefings(): Promise<TalaBriefing[]> {
   return data as TalaBriefing[];
 }
 
+/**
+ * Generate a briefing server-side via the SQL function (same logic the daily
+ * cron job uses). Returns the freshly inserted row, or null on failure.
+ * Falls back to the in-browser compute on the client if the RPC is missing.
+ */
+export async function generateTalaBriefing(): Promise<TalaBriefing | null> {
+  if (!isSupabaseConnected() || !supabase) return null;
+  const { data, error } = await supabase.rpc("generate_tala_briefing");
+  if (error || !data) return null;
+  return data as TalaBriefing;
+}
+
 export async function addTalaWin(input: {
   brief_date: string;
   text: string;
