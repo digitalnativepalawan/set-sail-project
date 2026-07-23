@@ -404,11 +404,10 @@ export function useTalaChat(): UseTalaChat {
       confirmBookingDraft(
         { ...pendingDraft, notes },
         persistCms,
-        options?.cms ? options.cms.settings.whatsapp : undefined,
       );
       setPendingDraft(null);
     },
-    [pendingDraft, persistCms, options],
+    [pendingDraft, persistCms],
   );
 
   return { messages, thinking, error, lastRun, send, reset, clearDraft, pendingDraft, confirmDraft };
