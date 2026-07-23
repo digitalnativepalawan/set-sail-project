@@ -10,8 +10,10 @@ import {
   Volume2,
   VolumeX,
   X,
+  MessageCircle,
 } from "lucide-react";
 import { useCms } from "@/context/CmsContext";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { buildTalaSystemPrompt, talaGreeting } from "./talaPersona";
 import { useTalaChat, getDevApiKey, setDevApiKey } from "./useTalaChat";
 import { useTalaVoice } from "./useTalaVoice";
@@ -50,6 +52,12 @@ export function TalaWidget() {
   });
   const knowledge = useTalaKnowledge();
 
+  // Fallback to the human team — always points at the primary WhatsApp number
+  // configured in Admin → WhatsApp. Shows as a persistent button and again
+  // whenever TALA errors or can't finish the job.
+  const waHref = buildWhatsAppLink(data.settings.whatsapp, data.settings.contact, {
+    message: `Hi Marina Terrace! I was just chatting with TALA and need a hand: `,
+  });
   const systemPrompt = useMemo(
     () => buildTalaSystemPrompt(data, knowledge.entries),
     [data, knowledge.entries],
@@ -253,6 +261,19 @@ export function TalaWidget() {
                 {chat.error}
               </p>
             )}
+
+            {/* Fallback to a human — always available, and the safety net when
+                TALA can't finish the job. */}
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noreferrer"
+              className="mx-3 mb-2 flex items-center justify-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+              style={{ borderColor: "#25D36688", color: "#1F7A3D", backgroundColor: "#25D36614" }}
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              {chat.error ? "TALA hit a snag — message us on WhatsApp" : "Prefer a human? Message us on WhatsApp"}
+            </a>
           </div>
 
           {/* Composer */}
