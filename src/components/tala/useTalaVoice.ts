@@ -557,7 +557,7 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
   // short sample as that voice, and reports playing state via previewState.
   const [previewId, setPreviewId] = useState<string | null>(null);
   const preview = useCallback(
-    async (id: string, text: string) => {
+    async (id: string, text?: string) => {
       if (providerRef.current === "openrouter") {
         // OpenRouter provider has no per-voice sample here; just speak as-is.
         speak(text);
