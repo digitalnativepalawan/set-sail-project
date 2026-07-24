@@ -524,6 +524,33 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
   // download finishes; it runs before playQueue exists, so it goes via a ref.
   playQueueRef.current = playQueue;
 
+  const speak = useCallback(
+    (text: string) => {
+      if (!enabled) return;
+      const chunks = splitSentences(text);
+      if (!chunks.length) return;
+      stop();
+      queueRef.current = chunks;
+      // Natural voice still downloading? Hold the reply instead of speaking
+      // it robotically — the wait cap keeps a slow connection from muting
+      // TALA forever. Once cached (second visit onward) this never waits.
+      // Irrelevant for the OpenRouter provider: there's no local download.
+      if (providerRef.current === "kokoro" && !kokoroRef.current && kokoroLoading.current) {
+        pendingSpeakRef.current = true;
+        setStatus("loading");
+        waitTimerRef.current = setTimeout(() => {
+          if (pendingSpeakRef.current) {
+            pendingSpeakRef.current = false;
+            void playQueue();
+          }
+        }, KOKORO_WAIT_CAP_MS);
+        return;
+      }
+      void playQueue();
+    },
+    [enabled, stop, playQueue],
+  );
+
   // Audition a specific Kokoro voice without changing the saved selection.
   // Used by the admin "female voice picker" so David can hear each option
   // before picking. Loads the model on demand (same cached 80 MB), speaks a
@@ -572,33 +599,6 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
       }
     },
     [speak, setEnabled],
-  );
-
-  const speak = useCallback(
-    (text: string) => {
-      if (!enabled) return;
-      const chunks = splitSentences(text);
-      if (!chunks.length) return;
-      stop();
-      queueRef.current = chunks;
-      // Natural voice still downloading? Hold the reply instead of speaking
-      // it robotically — the wait cap keeps a slow connection from muting
-      // TALA forever. Once cached (second visit onward) this never waits.
-      // Irrelevant for the OpenRouter provider: there's no local download.
-      if (providerRef.current === "kokoro" && !kokoroRef.current && kokoroLoading.current) {
-        pendingSpeakRef.current = true;
-        setStatus("loading");
-        waitTimerRef.current = setTimeout(() => {
-          if (pendingSpeakRef.current) {
-            pendingSpeakRef.current = false;
-            void playQueue();
-          }
-        }, KOKORO_WAIT_CAP_MS);
-        return;
-      }
-      void playQueue();
-    },
-    [enabled, stop, playQueue],
   );
 
   // Some browsers populate speechSynthesis voices asynchronously.
