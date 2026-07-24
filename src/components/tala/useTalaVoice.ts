@@ -560,7 +560,7 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
     async (id: string, text?: string) => {
       if (providerRef.current === "openrouter") {
         // OpenRouter provider has no per-voice sample here; just speak as-is.
-        speak(text);
+        speak(text || "Hi, I'm TALA — your friend in San Vicente. Lovely to meet you!");
         return;
       }
       if (!kokoroRef.current) {
