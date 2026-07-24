@@ -555,6 +555,8 @@ export function useTalaVoice(options?: UseTalaVoiceOptions): UseTalaVoice {
   // Used by the admin "female voice picker" so David can hear each option
   // before picking. Loads the model on demand (same cached 80 MB), speaks a
   // short sample as that voice, and reports playing state via previewState.
+  // Defined AFTER `speak` so the [speak, setEnabled] deps don't hit it in the
+  // temporal dead zone (speak is a const declared just above).
   const [previewId, setPreviewId] = useState<string | null>(null);
   const preview = useCallback(
     async (id: string, text?: string) => {
