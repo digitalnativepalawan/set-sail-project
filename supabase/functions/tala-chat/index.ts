@@ -28,6 +28,19 @@ import {
   type BaseMessage,
 } from "npm:@langchain/core@0.3.27/messages";
 import { z } from "npm:zod@3.25.28";
+
+// Runs a promise in the background without delaying the response. Registers
+// it with EdgeRuntime.waitUntil (Supabase's Deno runtime) so the isolate
+// isn't frozen/recycled before the write completes — a bare `void fn()`
+// alone is not guaranteed to survive past the response being sent.
+declare const EdgeRuntime: { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
+function runInBackground(promise: Promise<unknown>): void {
+  if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+    EdgeRuntime.waitUntil(promise);
+  } else {
+    void promise;
+  }
+}
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const FREE_MODELS = [
@@ -434,40 +447,50 @@ export async function handleRequest(req: Request): Promise<Response> {
   async function auditNode(state: typeof AgentState.State) {
     const lastHuman = [...state.messages].reverse().find((m) => m._getType() === "human");
     const lastAi = [...state.messages].reverse().find((m) => m._getType() === "ai");
-    try {
-      await supabase.from("tala_audit_log").insert({
-        intent: state.classification.intent,
-        urgency: state.classification.urgency,
-        department: state.classification.department,
-        guest_message: String(lastHuman?.content ?? "").slice(0, 500),
-        reply_preview: String(lastAi?.content ?? "").slice(0, 300),
-        tools_used: state.toolsUsed,
-      });
-    } catch {
-      // audit must never break the conversation
-    }
+    // Fire-and-forget: audit logging and lead capture must never add latency
+    // to the guest-facing reply, and must never break the conversation.
+    runInBackground(
+      (async () => {
+        try {
+          await supabase.from("tala_audit_log").insert({
+            intent: state.classification.intent,
+            urgency: state.classification.urgency,
+            department: state.classification.department,
+            guest_message: String(lastHuman?.content ?? "").slice(0, 500),
+            reply_preview: String(lastAi?.content ?? "").slice(0, 300),
+            tools_used: state.toolsUsed,
+          });
+        } catch {
+          // audit must never break the conversation
+        }
+      })(),
+    );
     // Auto lead capture: if the guest shared a contact or name, save it even
     // when the conversation ends before a booking/WhatsApp handoff.
-    try {
-      const text = String(lastHuman?.content ?? "");
-      const email = text.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)?.[0];
-      const phoneRaw = text.match(/(?:\+?\d[\d\s()-]{7,}\d)/)?.[0];
-      const phone = phoneRaw?.replace(/[\s()-]/g, "");
-      const name = text.match(/\b(i am|i'm|my name is|this is|it's|name's)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/)?.[2];
-      if (email || phone || name) {
-        const parts: string[] = [];
-        if (email) parts.push(`email ${email}`);
-        if (phone) parts.push(`phone ${phone}`);
-        await supabase.from("tala_leads").insert({
-          name: name ?? "",
-          contact: (email || phone || "").slice(0, 200),
-          note: (parts.join("; ") || "guest shared contact in chat").slice(0, 1000),
-          source: "tala_chat_auto",
-        });
-      }
-    } catch {
-      // lead capture must never break the conversation
-    }
+    runInBackground(
+      (async () => {
+        try {
+          const text = String(lastHuman?.content ?? "");
+          const email = text.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)?.[0];
+          const phoneRaw = text.match(/(?:\+?\d[\d\s()-]{7,}\d)/)?.[0];
+          const phone = phoneRaw?.replace(/[\s()-]/g, "");
+          const name = text.match(/\b(i am|i'm|my name is|this is|it's|name's)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/)?.[2];
+          if (email || phone || name) {
+            const parts: string[] = [];
+            if (email) parts.push(`email ${email}`);
+            if (phone) parts.push(`phone ${phone}`);
+            await supabase.from("tala_leads").insert({
+              name: name ?? "",
+              contact: (email || phone || "").slice(0, 200),
+              note: (parts.join("; ") || "guest shared contact in chat").slice(0, 1000),
+              source: "tala_chat_auto",
+            });
+          }
+        } catch {
+          // lead capture must never break the conversation
+        }
+      })(),
+    );
     return {};
   }
 
