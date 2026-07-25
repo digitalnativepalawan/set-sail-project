@@ -165,11 +165,14 @@ async function askEdgeFunction(
   if (!res.ok) {
     throw new Error(data?.error || `TALA service error (HTTP ${res.status})`);
   }
-  const message = data?.message as AssistantReply | undefined;
-  if (!message || (!message.content && !message.tool_calls?.length)) {
+  // The edge function resolves tool calls itself (server-side graph loop) and
+  // only ever returns the final assistant text as `reply` — there is no
+  // `message`/`tool_calls` field to read here.
+  const reply = typeof data?.reply === "string" ? data.reply.trim() : "";
+  if (!reply) {
     throw new Error("TALA returned an empty reply.");
   }
-  return message;
+  return { content: reply, tool_calls: undefined };
 }
 
 /**
