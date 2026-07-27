@@ -3,6 +3,7 @@ import { MapPin, MessageCircle, CalendarCheck } from "lucide-react";
 import { useCms } from "@/context/CmsContext";
 import { safeHref } from "@/lib/security";
 import { getBackgroundEmbedUrl } from "@/lib/videoUtils";
+import { openTala } from "@/components/tala/talaOpen";
 
 export function Hero() {
   const { data } = useCms();
@@ -111,7 +112,7 @@ export function Hero() {
           className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:gap-4"
         >
           <button
-            onClick={() => scrollTo(hero.primaryButtonLink)}
+            onClick={() => openTala("Hi TALA! I'd like to check availability and book a stay.")}
             className="group inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#C6A15B] px-5 text-[13px] font-medium tracking-wide text-[#221D14] shadow-[0_4px_14px_rgba(198,161,91,0.35),inset_0_1px_0_rgba(255,255,255,0.25)] transition-all duration-200 hover:bg-[#D9BA80] hover:shadow-[0_6px_20px_rgba(198,161,91,0.5),inset_0_1px_0_rgba(255,255,255,0.25)] active:scale-[0.98] sm:h-12 sm:px-6 sm:text-sm"
           >
             <MessageCircle className="h-4 w-4" />
