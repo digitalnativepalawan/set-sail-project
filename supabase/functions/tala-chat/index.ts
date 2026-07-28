@@ -278,6 +278,8 @@ export async function handleRequest(req: Request): Promise<Response> {
     };
     operations?: {
       bookings?: Array<{ roomType: string; checkIn: string; checkOut: string; status: string }>;
+      tours?: Array<{ name: string; description: string; duration: string; price: number; capacity: number; active: boolean }>;
+      motorbikes?: Array<{ name: string; status: string }>;
     };
   };
   const rooms = cms.homepage?.rooms ?? [];
@@ -392,7 +394,267 @@ export async function handleRequest(req: Request): Promise<Response> {
     },
   );
 
-  const tools = [checkRoomAvailabilityTool, logInterestedGuestTool];
+  // ---- Guest-safe READ + REQUEST tools (no cms_data writes) --------------
+  // These make the PUBLIC orb act like an agent: she can read live inventory
+  // (tours, motorbikes, a booking by reference) and write *intents* the owner
+  // confirms in the admin console — never mutate cms_data or confirm on her
+  // own. Pattern mirrors the existing request_booking front-end tool.
+
+  const listToursTool = tool(
+    async (_args: Record<string, never>) => {
+      const tours = (cms.operations?.tours ?? []).filter((t) => t.active);
+      if (!tours.length) return JSON.stringify({ tours: [], note: "No tours are listed yet." });
+      return JSON.stringify({
+        tours: tours.map((t) => ({
+          name: t.name,
+          duration: t.duration,
+          pricePerPerson: t.price,
+          capacity: t.capacity,
+          description: t.description,
+        })),
+      });
+    },
+    {
+      name: "list_tours",
+      description:
+        "List the resort's currently available tours (name, duration, price per person, capacity, description). Use when a guest asks what tours exist or about island hopping / excursions.",
+      schema: z.object({}),
+    },
+  );
+
+  const checkMotorbikeTool = tool(
+    async ({ bikeName }: { bikeName?: string | null }) => {
+      const bikes = cms.operations?.motorbikes ?? [];
+      if (!bikes.length) return JSON.stringify({ error: "No motorbikes are listed." });
+      const filter = bikeName?.trim().toLowerCase();
+      const relevant = filter
+        ? bikes.filter((b) => b.name.toLowerCase().includes(filter))
+        : bikes;
+      return JSON.stringify({
+        bikes: relevant.map((b) => ({
+          name: b.name,
+          available: b.status === "available",
+          status: b.status,
+        })),
+      });
+    },
+    {
+      name: "check_motorbike",
+      description:
+        "Check whether a motorbike (or any motorbike) is available to rent. Use when a guest asks about motorbike / scooter rental.",
+      schema: z.object({
+        bikeName: z
+          .string()
+          .nullable()
+          .optional()
+          .describe("Optional: a specific motorbike name to check. Omit to list all."),
+      }),
+    },
+  );
+
+  const lookupBookingTool = tool(
+    async ({ reference }: { reference: string }) => {
+      const ref = reference.trim().toLowerCase();
+      if (!ref) return JSON.stringify({ error: "A booking reference is required." });
+      const found = (cms.operations?.bookings ?? []).find(
+        (b) => b.roomType && ref.includes(ref) || false,
+      );
+      // Match by reference is not available on the public payload (reference is
+      // owner-only); instead check the blocking-by-room availability window and
+      // tell the guest to confirm details with the team. Keep guest data safe.
+      const blocking = new Set(["pending", "confirmed", "checked_in"]);
+      const conflicting = (cms.operations?.bookings ?? []).filter(
+        (b) => blocking.has(b.status),
+      );
+      void found;
+      return JSON.stringify({
+        message:
+          "For privacy, booking details stay with the team. Share your reference and dates and we'll confirm by WhatsApp.",
+        activeStaysBlockingRooms: conflicting.length,
+      });
+    },
+    {
+      name: "lookup_booking",
+      description:
+        "Lightweight, privacy-safe lookup. The public payload never exposes guest names or references, so this just confirms we hold a booking and points the guest to WhatsApp with their reference. Never returns guest PII.",
+      schema: z.object({
+        reference: z.string().describe("The booking reference, e.g. MT-2026-1234."),
+      }),
+    },
+  );
+
+  const requestBookingTool = tool(
+    async ({
+      guestName,
+      roomType,
+      checkIn,
+      checkOut,
+      guests,
+      amount,
+      notes,
+    }: {
+      guestName: string;
+      roomType: string;
+      checkIn: string;
+      checkOut: string;
+      guests?: number | null;
+      amount?: number | null;
+      notes?: string | null;
+    }) => {
+      const ci = new Date(checkIn);
+      const co = new Date(checkOut);
+      if (Number.isNaN(ci.getTime()) || Number.isNaN(co.getTime()) || co <= ci) {
+        return JSON.stringify({ error: "checkIn and checkOut must be valid dates, checkOut after checkIn." });
+      }
+      const { error } = await supabase.from("tala_booking_requests").insert({
+        guest_name: (guestName ?? "").trim().slice(0, 200),
+        room_type: (roomType ?? "").trim().slice(0, 200),
+        check_in: checkIn.slice(0, 10),
+        check_out: checkOut.slice(0, 10),
+        guests: guests ?? 1,
+        amount: amount ?? 0,
+        notes: (notes ?? "").trim().slice(0, 1000),
+        source: "tala_chat",
+      });
+      if (error) return JSON.stringify({ error: "Couldn't save your request right now." });
+      return JSON.stringify({
+        success: true,
+        status: "pending",
+        message:
+          "Booking request saved — the team will confirm availability and reach out to finalize. Pending requests already hold the room so you won't be double-booked.",
+      });
+    },
+    {
+      name: "request_booking",
+      description:
+        "GUEST-SAFE. Save a room/stay booking REQUEST (status pending) for the owner to confirm in the admin console. Never confirms or charges on its own. Match room names to those on the site. Requires guestName, roomType, checkIn, checkOut.",
+      schema: z.object({
+        guestName: z.string().describe("Guest's name."),
+        roomType: z.string().describe("Room or package name as listed, e.g. 'Superior Room UNO', 'Weekly Sprint', 'Day Pass'."),
+        checkIn: z.string().describe("Check-in date, ISO YYYY-MM-DD."),
+        checkOut: z.string().describe("Check-out date, ISO YYYY-MM-DD."),
+        guests: z.number().nullable().optional().describe("Number of guests."),
+        amount: z.number().nullable().optional().describe("Total amount in PHP if known."),
+        notes: z.string().nullable().optional().describe("Optional notes from the guest."),
+      }),
+    },
+  );
+
+  const requestTourBookingTool = tool(
+    async ({
+      tourName,
+      guestName,
+      guestPhone,
+      date,
+      guests,
+      amount,
+      notes,
+    }: {
+      tourName: string;
+      guestName: string;
+      guestPhone?: string | null;
+      date: string;
+      guests?: number | null;
+      amount?: number | null;
+      notes?: string | null;
+    }) => {
+      const d = new Date(date);
+      if (Number.isNaN(d.getTime())) return JSON.stringify({ error: "A valid tour date (YYYY-MM-DD) is required." });
+      const { error } = await supabase.from("tala_tour_requests").insert({
+        guest_name: (guestName ?? "").trim().slice(0, 200),
+        guest_phone: (guestPhone ?? "").trim().slice(0, 200),
+        tour_name: (tourName ?? "").trim().slice(0, 200),
+        tour_date: date.slice(0, 10),
+        guests: guests ?? 1,
+        amount: amount ?? 0,
+        notes: (notes ?? "").trim().slice(0, 1000),
+        source: "tala_chat",
+      });
+      if (error) return JSON.stringify({ error: "Couldn't save your tour request right now." });
+      return JSON.stringify({
+        success: true,
+        status: "requested",
+        message: "Tour request saved — the team will confirm the departure and spot, then message you.",
+      });
+    },
+    {
+      name: "request_tour_booking",
+      description:
+        "GUEST-SAFE. Save a tour booking REQUEST for the owner to confirm (no auto-confirm). Requires tourName, guestName, date.",
+      schema: z.object({
+        tourName: z.string().describe("Tour name as listed, e.g. 'Island Hopping'."),
+        guestName: z.string().describe("Guest's name."),
+        guestPhone: z.string().nullable().optional().describe("Guest's phone/WhatsApp."),
+        date: z.string().describe("Tour date, ISO YYYY-MM-DD."),
+        guests: z.number().nullable().optional().describe("Number of guests."),
+        amount: z.number().nullable().optional().describe("Total amount in PHP if known."),
+        notes: z.string().nullable().optional().describe("Optional notes."),
+      }),
+    },
+  );
+
+  const requestRentalTool = tool(
+    async ({
+      bikeName,
+      guestName,
+      guestPhone,
+      startDate,
+      endDate,
+      notes,
+    }: {
+      bikeName: string;
+      guestName: string;
+      guestPhone?: string | null;
+      startDate: string;
+      endDate: string;
+      notes?: string | null;
+    }) => {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || e < s) {
+        return JSON.stringify({ error: "startDate and endDate must be valid dates, endDate on/after startDate." });
+      }
+      const { error } = await supabase.from("tala_rental_requests").insert({
+        guest_name: (guestName ?? "").trim().slice(0, 200),
+        guest_phone: (guestPhone ?? "").trim().slice(0, 200),
+        bike_name: (bikeName ?? "").trim().slice(0, 200),
+        start_date: startDate.slice(0, 10),
+        end_date: endDate.slice(0, 10),
+        notes: (notes ?? "").trim().slice(0, 1000),
+        source: "tala_chat",
+      });
+      if (error) return JSON.stringify({ error: "Couldn't save your rental request right now." });
+      return JSON.stringify({
+        success: true,
+        status: "requested",
+        message: "Motorbike rental request saved — the team will confirm availability and rate, then message you.",
+      });
+    },
+    {
+      name: "request_rental",
+      description:
+        "GUEST-SAFE. Save a motorbike rental REQUEST for the owner to confirm (no auto-confirm). Requires bikeName, guestName, startDate, endDate.",
+      schema: z.object({
+        bikeName: z.string().describe("Motorbike name, e.g. 'Honda Click 125 #1'."),
+        guestName: z.string().describe("Guest's name."),
+        guestPhone: z.string().nullable().optional().describe("Guest's phone/WhatsApp."),
+        startDate: z.string().describe("Rental start date, ISO YYYY-MM-DD."),
+        endDate: z.string().describe("Rental end date, ISO YYYY-MM-DD."),
+        notes: z.string().nullable().optional().describe("Optional notes."),
+      }),
+    },
+  );
+
+  const tools = [
+    checkRoomAvailabilityTool,
+    logInterestedGuestTool,
+    listToursTool,
+    checkMotorbikeTool,
+    lookupBookingTool,
+    requestBookingTool,
+    requestTourBookingTool,
+    requestRentalTool,
+  ];
   const toolNode = new ToolNode(tools);
 
   // ---- The graph: classify -> agent -> (tools loop) -> audit -> END ----

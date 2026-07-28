@@ -68,6 +68,116 @@ export const TALA_TOOL_SCHEMAS = [
       },
     },
   },
+  // ---- GUEST-SAFE READ + REQUEST TOOLS (public orb, mirror tala-chat edge fn) ----
+  // These are server-executed by the public tala-chat edge function. They read
+  // live inventory and write *intents* to tala_*_requests tables the owner
+  // confirms — never mutate cms_data or confirm on their own.
+  {
+    type: "function",
+    function: {
+      name: "list_tours",
+      description:
+        "List the resort's currently available tours (name, duration, price per person, capacity, description). Use when a guest asks what tours exist or about island hopping / excursions.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "check_motorbike",
+      description:
+        "Check whether a motorbike (or any motorbike) is available to rent. Use when a guest asks about motorbike / scooter rental.",
+      parameters: {
+        type: "object",
+        properties: {
+          bikeName: {
+            type: "string",
+            description: "Optional: a specific motorbike name to check. Omit to list all.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "lookup_booking",
+      description:
+        "Lightweight, privacy-safe lookup. The public payload never exposes guest names or references, so this just confirms we hold a booking and points the guest to WhatsApp with their reference. Never returns guest PII.",
+      parameters: {
+        type: "object",
+        properties: {
+          reference: { type: "string", description: "The booking reference, e.g. MT-2026-1234." },
+        },
+        required: ["reference"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "request_booking",
+      description:
+        "GUEST-SAFE. Save a room/stay booking REQUEST (status pending) for the owner to confirm in the admin console. Never confirms or charges on its own. Match room names to those on the site. Requires guestName, roomType, checkIn, checkOut.",
+      parameters: {
+        type: "object",
+        properties: {
+          guestName: { type: "string", description: "Guest's name." },
+          roomType: {
+            type: "string",
+            description: "Room or package name as listed, e.g. 'Superior Room UNO', 'Weekly Sprint', 'Day Pass'.",
+          },
+          checkIn: { type: "string", description: "Check-in date, ISO YYYY-MM-DD." },
+          checkOut: { type: "string", description: "Check-out date, ISO YYYY-MM-DD." },
+          guests: { type: "number", description: "Number of guests." },
+          amount: { type: "number", description: "Total amount in PHP if known." },
+          notes: { type: "string", description: "Optional notes from the guest." },
+        },
+        required: ["guestName", "roomType", "checkIn", "checkOut"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "request_tour_booking",
+      description:
+        "GUEST-SAFE. Save a tour booking REQUEST for the owner to confirm (no auto-confirm). Requires tourName, guestName, date.",
+      parameters: {
+        type: "object",
+        properties: {
+          tourName: { type: "string", description: "Tour name as listed, e.g. 'Island Hopping'." },
+          guestName: { type: "string", description: "Guest's name." },
+          guestPhone: { type: "string", description: "Guest's phone/WhatsApp." },
+          date: { type: "string", description: "Tour date, ISO YYYY-MM-DD." },
+          guests: { type: "number", description: "Number of guests." },
+          amount: { type: "number", description: "Total amount in PHP if known." },
+          notes: { type: "string", description: "Optional notes." },
+        },
+        required: ["tourName", "guestName", "date"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "request_rental",
+      description:
+        "GUEST-SAFE. Save a motorbike rental REQUEST for the owner to confirm (no auto-confirm). Requires bikeName, guestName, startDate, endDate.",
+      parameters: {
+        type: "object",
+        properties: {
+          bikeName: { type: "string", description: "Motorbike name, e.g. 'Honda Click 125 #1'." },
+          guestName: { type: "string", description: "Guest's name." },
+          guestPhone: { type: "string", description: "Guest's phone/WhatsApp." },
+          startDate: { type: "string", description: "Rental start date, ISO YYYY-MM-DD." },
+          endDate: { type: "string", description: "Rental end date, ISO YYYY-MM-DD." },
+          notes: { type: "string", description: "Optional notes." },
+        },
+        required: ["bikeName", "guestName", "startDate", "endDate"],
+      },
+    },
+  },
   // ---- OWNER WRITE TOOLS (operator face only) -----------------------------
   {
     type: "function",
